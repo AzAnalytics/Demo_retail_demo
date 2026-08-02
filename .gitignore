@@ -1,0 +1,27 @@
+# Environnement Python (propre à chaque machine — ne jamais versionner)
+venv/
+.venv/
+env/
+
+# Caches Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secrets & variables d'environnement (JAMAIS versionnés)
+.env
+.env.*
+!.env.example
+*.env
+.streamlit/secrets.toml
+
+# Logs / temporaires
+st.log
+*.log
+
+# macOS
+.DS_Store
+._*
+
+# Vidéo du logo (générée via Gemini, souvent lourde — décommente si tu veux la versionner)
+# assets/cockpit_logo.mp4
