@@ -23,5 +23,11 @@ st.log
 .DS_Store
 ._*
 
+# Outils agent / environnement de dev — jamais versionnés
+.agents/
+.claude/
+.cursor/
+.vscode/
+
 # Vidéo du logo (générée via Gemini, souvent lourde — décommente si tu veux la versionner)
 # assets/cockpit_logo.mp4

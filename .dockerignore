@@ -1,0 +1,18 @@
+# Ne pas embarquer ces éléments dans l'image Docker (plus léger, plus sûr)
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+*.log
+st.log
+.DS_Store
+._*
+.streamlit/secrets.toml
+DEPLOIEMENT_GCP.md
+assets/GEMINI_logo_anime.md
