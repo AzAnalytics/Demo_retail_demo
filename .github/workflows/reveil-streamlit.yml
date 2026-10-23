@@ -1,0 +1,25 @@
+name: Réveil de l'application Streamlit
+
+# Streamlit Community Cloud endort une application sans visite pendant environ 12 h.
+# Cette tâche l'ouvre dans un navigateur 3 fois par jour pour qu'elle reste en ligne.
+# Les horaires sont en UTC. Lancement manuel possible depuis l'onglet Actions.
+on:
+  schedule:
+    - cron: "0 5,13,21 * * *"
+  workflow_dispatch:
+
+jobs:
+  reveil:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Ouvrir l'application
+        run: python .github/scripts/reveil_streamlit.py
