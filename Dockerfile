@@ -19,10 +19,17 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-# Lancement de Streamlit, headless, sur le port fourni par Cloud Run
+# Lancement de Streamlit, headless, sur le port fourni par Cloud Run.
+#
+# NOTE — ne pas réintroduire « --server.enableCORS=false » :
+# cette option est incompatible avec --server.enableXsrfProtection=true.
+# Streamlit l'ignore et la repasse à true en affichant un avertissement au
+# démarrage. Elle n'est de toute façon pas nécessaire pour embarquer l'app en
+# iframe : la page intégrée est servie par la même origine que le websocket.
+# On garde donc la protection XSRF active (c'est le réglage sûr).
 CMD streamlit run app.py \
     --server.port=${PORT} \
     --server.address=0.0.0.0 \
     --server.headless=true \
-    --server.enableCORS=false \
-    --server.enableXsrfProtection=true
+    --server.enableXsrfProtection=true \
+    --browser.gatherUsageStats=false
