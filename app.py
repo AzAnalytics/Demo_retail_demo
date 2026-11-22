@@ -89,6 +89,11 @@ def lib_mois(ts):
 mois_ref = d["mois"].max()
 cur = d[d["mois"] == mois_ref]
 
+# Le mois analysé est-il complet ? On le déduit des données, pas du calendrier :
+# si les ventes s'arrêtent avant la fin du mois, le mois est en cours.
+dernier_jour = int(cur["date"].max().day)
+mois_complet = dernier_jour >= mois_ref.days_in_month
+
 mois_cmp = mois_ref - pd.DateOffset(years=1)
 cmp = d[d["mois"] == mois_cmp]
 type_compa = "au même mois un an avant"
@@ -96,6 +101,15 @@ if cmp.empty:
     mois_cmp = d.loc[d["mois"] < mois_ref, "mois"].max()
     cmp = d[d["mois"] == mois_cmp] if pd.notna(mois_cmp) else cur.iloc[0:0]
     type_compa = "au mois précédent disponible"
+
+# Comparaison à périmètre égal : comparer un mois en cours (ex. 20 jours) à un
+# mois complet (30 jours) fabrique une baisse qui n'existe pas. On tronque donc
+# le mois de comparaison au même nombre de jours écoulés.
+note_perimetre = ""
+if not mois_complet and not cmp.empty:
+    cmp = cmp[cmp["date"].dt.day <= dernier_jour]
+    note_perimetre = (f" Mois en cours : la comparaison est arrêtée au "
+                      f"{dernier_jour} du mois des deux côtés, à périmètre égal.")
 
 def kpis(x):
     ca = x["ca_ttc"].sum(); marge = x["marge"].sum()
@@ -115,6 +129,7 @@ st.caption(
     f"Mois analysé : {lib_mois(mois_ref)} "
     f"({cur['date'].min():%d/%m/%Y} au {cur['date'].max():%d/%m/%Y}, {len(cur)} ventes). "
     f"Comparé {type_compa} : {lib_mois(mois_cmp)} ({len(cmp)} ventes)."
+    + note_perimetre
 )
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Chiffre d'affaires", eur(ca_c), delta(ca_c, ca_p))
