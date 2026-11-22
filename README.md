@@ -109,5 +109,17 @@ Python · Pandas · NumPy · Streamlit · Plotly
 (Prévisions codées en NumPy pur — aucune dépendance ML lourde.)
 
 ## Données
-`ventes_maison_lauret.csv` : 33 940 transactions sur 18 mois (jan. 2025 → juin 2026),
-générées par `generate_dataset.py` avec une saisonnalité réaliste.
+`ventes_maison_lauret.csv` : environ 34 000 transactions sur une fenêtre
+**glissante de 18 mois qui se termine aujourd'hui**, générées par
+`generate_dataset.py` avec une saisonnalité réaliste (pic de Noël, creux
+d'été, week-ends plus forts).
+
+La fenêtre glisse pour que la démo n'affiche jamais un mois périmé à un
+visiteur. Le tirage est déterministe pour un mois donné : régénérer deux fois
+le même mois produit le même jeu de données. L'application vérifie la
+fraîcheur à chaque journée et régénère le fichier si besoin — aucune
+intervention à prévoir.
+
+```bash
+python generate_dataset.py     # régénération manuelle
+```

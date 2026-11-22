@@ -7,6 +7,8 @@ Démonstrateur de l'offre "Le Cockpit" — Alexis Zueras.
 Lancer :  streamlit run app.py
 """
 import streamlit as st
+from datetime import date
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -46,13 +48,29 @@ def eur(x):                  # formatage français : 1 234 €
 # DONNÉES
 # ==================================================================
 @st.cache_data
-def charger_donnees():
-    df = pd.read_csv(config.DATA_FILE, parse_dates=["date"])
+def charger_donnees(jour: str):
+    """`jour` sert de clé de cache : la fraîcheur est revérifiée chaque journée.
+
+    Les données de démonstration glissent avec le temps. Si le CSV s'arrête
+    trop loin dans le passé, on le régénère : la démo ne peut pas afficher un
+    mois périmé à un prospect.
+    """
+    import generate_dataset as gd
+
+    if gd.est_perime(config.DATA_FILE):
+        df = gd.generer()
+        try:
+            df.to_csv(config.DATA_FILE, index=False)
+        except OSError:
+            pass            # système de fichiers en lecture seule : on reste en mémoire
+        df["date"] = pd.to_datetime(df["date"])
+    else:
+        df = pd.read_csv(config.DATA_FILE, parse_dates=["date"])
     df["mois"] = df["date"].dt.to_period("M").dt.to_timestamp()
     df["jour_sem"] = df["date"].dt.dayofweek
     return df
 
-df = charger_donnees()
+df = charger_donnees(date.today().isoformat())
 
 # En-tête (toujours affiché)
 header("Maison Lauret",
