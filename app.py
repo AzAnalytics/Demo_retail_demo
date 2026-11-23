@@ -160,9 +160,9 @@ if profil is not None or SESSION_OUVERTE:
         marques = [profil.nom or profil.identifiant, profil.role]
         if not profil.voit_tout:
             marques.append(profil.resume().replace("Périmètre, ", ""))
-        qui.caption(":material/lock: " + " · ".join(marques))
+        qui.caption("🔒 " + " · ".join(marques))
     else:
-        qui.caption(":material/lock: Session ouverte.")
+        qui.caption("🔒 Session ouverte.")
     with sortie:
         acces.bouton_deconnexion()
 
@@ -171,7 +171,7 @@ OBJECTIF_CROISSANCE = config.OBJECTIF_CROISSANCE
 SEUIL_ALERTE = config.SEUIL_ALERTE
 if autorise_a("reglages"):
     with st.sidebar:
-        st.subheader(":material/tune: Réglages")
+        st.subheader("⚙️ Réglages")
         st.caption("Pour cette session seulement. Le fichier de configuration "
                    "n'est pas modifié.")
         OBJECTIF_CROISSANCE = 1 + st.slider(
@@ -466,7 +466,7 @@ else:
 # PANNEAUX RÉSERVÉS (diagnostic, administration)
 # ==================================================================
 if autorise_a("diagnostic"):
-    with st.expander("État technique", icon=":material/build:"):
+    with st.expander("🔧 État technique"):
         source = getattr(config, "SOURCE", "csv")
         origine = (Path(str(config.DATA_FILE)).name
                    if source in ("csv", "excel") else source)
@@ -491,7 +491,7 @@ if autorise_a("diagnostic"):
         )
 
 if autorise_a("administrer") and PROFILS:
-    with st.expander("Comptes et périmètres", icon=":material/manage_accounts:"):
+    with st.expander("👤 Comptes et périmètres"):
         st.dataframe(
             pd.DataFrame([
                 {"Identifiant": p.identifiant, "Nom": p.nom, "Rôle": p.role,

@@ -188,6 +188,24 @@ def apply_theme() -> None:
     [data-baseweb="tag"] {{ background:var(--gold) !important; }}
     [data-baseweb="tag"] * {{ color:var(--navy) !important; }}
 
+    /* --- Hôte en thème sombre (Streamlit in Snowflake) ---------------
+       Snowflake ignore .streamlit/config.toml et impose son propre thème :
+       les champs de filtre apparaissent alors noirs sur fond crème. On
+       reprend la main sur les surfaces des widgets, sans toucher au reste. */
+    [data-baseweb="select"] > div,
+    [data-baseweb="input"] > div,
+    .stTextInput input, .stNumberInput input, .stDateInput input {{
+        background:#FFFFFF !important; color:var(--ink) !important;
+        border-color:#E4DFD3 !important; }}
+    [data-baseweb="select"] svg {{ fill:var(--muted) !important; }}
+    [data-baseweb="popover"] [role="listbox"],
+    [data-baseweb="menu"], [data-baseweb="menu"] li {{
+        background:#FFFFFF !important; color:var(--ink) !important; }}
+    [data-testid="stExpander"] {{ background:#FFFFFF; }}
+    .stTabs [data-baseweb="tab-list"] {{ background:transparent !important; }}
+    .stTabs [data-baseweb="tab"] p {{ color:var(--muted) !important; }}
+    .stTabs [aria-selected="true"] p {{ color:var(--navy) !important; }}
+
     /* --- Calendrier (date_input) : texte foncé sur fond clair --- */
     [data-baseweb="calendar"] {{ background:#FFFFFF; }}
     [data-baseweb="calendar"] *,

@@ -146,7 +146,7 @@ def ouvert(mot_de_passe_attendu: str, enseigne: str = "Le Cockpit") -> bool:
         if est_correct(saisie, mot_de_passe_attendu):
             st.session_state[CLEF_SESSION] = True
             return True
-        st.error("Mot de passe incorrect.", icon=":material/lock:")
+        st.error("Mot de passe incorrect.", icon="🔒")
         return False
 
 
@@ -181,7 +181,7 @@ def deconnecte() -> None:
 def bouton_deconnexion(conteneur=None, libelle: str = "Se déconnecter") -> None:
     """Le bouton, à placer là où la personne le cherchera."""
     cible = conteneur if conteneur is not None else st
-    if cible.button(libelle, icon=":material/logout:", key="_bouton_deconnexion"):
+    if cible.button(libelle, key="_bouton_deconnexion"):
         deconnecte()
 
 
@@ -207,8 +207,7 @@ def session(profils: dict, mot_de_passe_unique: str = "",
         with st.form("connexion", border=False):
             saisi = st.text_input("Identifiant")
             mot_de_passe = st.text_input("Mot de passe", type="password")
-            envoye = st.form_submit_button("Embarquer",
-                                           icon=":material/flight_takeoff:")
+            envoye = st.form_submit_button("Embarquer")
         if not envoye:
             _pied("Chacun embarque avec son périmètre : vous ne verrez que ce "
                   "qui vous revient.")
@@ -217,8 +216,7 @@ def session(profils: dict, mot_de_passe_unique: str = "",
         profil = perm.authentifie(saisi.strip(), mot_de_passe, profils)
         if profil is None:
             # Même message dans les deux cas : on ne dit pas si le compte existe.
-            st.error("Identifiant ou mot de passe incorrect.",
-                     icon=":material/lock:")
+            st.error("Identifiant ou mot de passe incorrect.", icon="🔒")
             return False, None
     st.session_state[CLEF_PROFIL] = profil.identifiant
     # Relance immédiate : sans cela le formulaire resterait affiché au-dessus
