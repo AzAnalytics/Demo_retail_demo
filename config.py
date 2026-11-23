@@ -62,7 +62,7 @@ TAUX_TVA = float(_get("COCKPIT_TAUX_TVA", "0.20"))
 # ------------------------------------------------------------------
 # D'où viennent les ventes (voir source_donnees.py et BASES-DE-DONNEES.md)
 # ------------------------------------------------------------------
-# csv (défaut) | excel | sqlite | oracle | odbc | postgres | sqlserver
+# csv (défaut) | excel | sqlite | oracle | odbc | postgres | sqlserver | snowflake
 SOURCE = _get("COCKPIT_SOURCE", "csv")
 
 # La requête SQL qui renvoie les colonnes du Cockpit. À écrire une fois par
@@ -78,6 +78,13 @@ _PARAMETRES_PAR_SOURCE = {
                "dsn": _get("COCKPIT_DB_DSN", "")},
     "odbc": {"chaine": _get("COCKPIT_DB_CHAINE", "")},
     "postgres": {"url": _get("COCKPIT_DB_URL", "")},
+    "snowflake": {"utilisateur": _get("COCKPIT_SF_UTILISATEUR", ""),
+                  "compte": _get("COCKPIT_SF_COMPTE", ""),
+                  "entrepot": _get("COCKPIT_SF_ENTREPOT", ""),
+                  "base": _get("COCKPIT_SF_BASE", ""),
+                  "schema": _get("COCKPIT_SF_SCHEMA", "PUBLIC"),
+                  "role": _get("COCKPIT_SF_ROLE", "") or None,
+                  "password": _get("COCKPIT_SF_MOTDEPASSE", "")},
     "sqlserver": {"chaine": _get("COCKPIT_DB_CHAINE", "")},
 }
 SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})

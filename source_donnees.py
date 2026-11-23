@@ -130,6 +130,32 @@ def connexion_postgres(url: str) -> Any:
     return psycopg.connect(url)
 
 
+def connexion_snowflake(utilisateur: str, compte: str, entrepot: str,
+                        base: str, schema: str = "PUBLIC",
+                        role: str | None = None, **identification: Any) -> Any:
+    """Snowflake : `pip install snowflake-connector-python`.
+
+        compte    = l'identifiant de compte, par exemple "xy12345.eu-west-1"
+        entrepot  = le warehouse qui exécutera la requête (il démarre tout seul)
+        role      = le rôle Snowflake, et c'est lui qui décide des lignes
+                    visibles si le client a des row access policies
+
+    L'identification passe en mots-clés : `password=...`, ou `private_key=...`
+    pour une clé, ou `authenticator="externalbrowser"` pour un SSO. Rien de
+    tout cela n'est écrit dans le code (voir config.py).
+
+    Un entrepôt dimensionné XS suffit largement pour un tableau de bord, et il
+    se met en pause tout seul : c'est le poste de coût à surveiller, pas le
+    stockage.
+    """
+    import snowflake.connector
+
+    return snowflake.connector.connect(
+        user=utilisateur, account=compte, warehouse=entrepot,
+        database=base, schema=schema, role=role, **identification,
+    )
+
+
 def connexion_sqlserver(chaine: str) -> Any:
     """SQL Server : `pip install pyodbc`, avec le pilote ODBC 18 installé."""
     return connexion_odbc(chaine)
@@ -186,6 +212,7 @@ FABRIQUES: dict[str, Callable[..., Any]] = {
     "oracle": connexion_oracle,
     "odbc": connexion_odbc,              # reprend une chaîne de connexion existante
     "postgres": connexion_postgres,
+    "snowflake": connexion_snowflake,
     "sqlserver": connexion_sqlserver,
 }
 

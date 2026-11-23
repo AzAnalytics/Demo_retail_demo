@@ -32,6 +32,7 @@ toujours, et il est testé (`test_source_donnees.py`).
 | SQL Server | `pip install pyodbc` + pilote ODBC 18 | `src.connexion_sqlserver(chaine_odbc)` |
 | MySQL / MariaDB | `pip install mysql-connector-python` | une connexion DBAPI, même usage |
 | SQLite | rien, c'est dans Python | `src.connexion_sqlite("ventes.db")` |
+| **Snowflake** | `pip install snowflake-connector-python` | `src.connexion_snowflake(user, compte, entrepot, base)` |
 | BigQuery | `pip install google-cloud-bigquery` | passe par son client, puis `valide(df)` |
 
 **Oracle, le point qui bloque d'habitude** : le pilote `oracledb` fonctionne en
@@ -75,6 +76,74 @@ simplicité : faire tourner le Cockpit sur un poste du client, programmer une
 extraction nocturne vers un fichier que le Cockpit lit, ou ouvrir un accès
 (VPN, liste d'adresses autorisées) ce que l'informatique accepte rarement pour
 un prestataire. La deuxième réponse est celle qui passe presque toujours.
+
+## 2 ter. Le cas Snowflake
+
+Snowflake peut jouer trois rôles différents, et il faut les distinguer avant
+d'en parler à un client.
+
+### Comme source de données (fait)
+
+```
+COCKPIT_SOURCE=snowflake
+COCKPIT_SF_COMPTE=xy12345.eu-west-1
+COCKPIT_SF_UTILISATEUR=COCKPIT_LECTURE
+COCKPIT_SF_MOTDEPASSE=...
+COCKPIT_SF_ENTREPOT=WH_XS
+COCKPIT_SF_BASE=VENTES
+COCKPIT_SF_SCHEMA=PUBLIC
+COCKPIT_SF_ROLE=ROLE_COCKPIT
+COCKPIT_SOURCE_REQUETE=SELECT ...
+```
+
+`pip install snowflake-connector-python`, et c'est tout : le Cockpit ne voit
+aucune différence avec Oracle ou un CSV. Le connecteur accepte aussi une clé
+privée ou un SSO (`authenticator="externalbrowser"`) à la place du mot de
+passe.
+
+Deux points de vigilance propres à Snowflake : l'**entrepôt** (warehouse) est
+ce qui coûte, pas le stockage, donc un XS avec mise en pause automatique
+suffit pour un tableau de bord ; et le **rôle** de connexion décide de ce que
+la requête rapporte.
+
+### Comme hébergeur : Streamlit in Snowflake
+
+Snowflake exécute l'application chez lui. C'est séduisant et ça règle d'un coup
+trois choses dont on a parlé : **plus de mise en veille**, les **données ne
+sortent jamais** de l'entrepôt du client, et l'accès est gouverné par les
+**rôles Snowflake** plutôt que par un fichier de comptes.
+
+Quatre contraintes à vérifier avant de le promettre :
+
+- les bibliothèques se prennent dans le canal Anaconda de Snowflake (pandas,
+  numpy et plotly y sont), et il n'y a pas d'accès internet sortant par défaut ;
+- la version de Streamlit y est **en retard** sur la dernière : certaines
+  fonctions récentes utilisées ici (conteneur identifié par `key`, largeurs
+  `stretch`, icônes `:material/...`) peuvent manquer, donc l'habillage est à
+  tester avant d'annoncer une date ;
+- pas d'écriture de fichiers : mettre `COCKPIT_DEMO_AUTO=0`, ce qui est de
+  toute façon la règle chez un client ;
+- l'application peut tourner avec les droits de son **propriétaire** plutôt que
+  ceux de l'utilisateur connecté. Dans ce cas, les politiques de sécurité par
+  ligne du client ne s'appliquent pas comme on le croit : c'est le premier
+  point à faire confirmer par leur administrateur.
+
+### Comme couche de sécurité
+
+C'est son meilleur apport. Les **row access policies** de Snowflake filtrent les
+lignes dans la base, selon le rôle de la personne connectée. C'est exactement
+le niveau 3 du chapitre sur les périmètres, en mieux : les lignes interdites ne
+sortent jamais du serveur, et c'est l'administrateur du client qui en répond,
+pas toi. Les périmètres de `permissions.py` deviennent alors inutiles, et seuls
+les rôles d'application (lecteur, contributeur, admin) gardent un sens.
+
+### Quand le proposer, et quand se taire
+
+Snowflake n'a de sens que si **le client en est déjà client**. Une PME de trois
+boutiques ou une salaison ne le sera jamais : lui proposer Snowflake, c'est lui
+vendre une facture mensuelle pour lire ses propres ventes. En revanche, face à
+une ETI, un grand compte ou une ESN, pouvoir dire « le Cockpit se branche sur
+votre Snowflake, et il peut même tourner dedans » change la conversation.
 
 ## 3. La requête : écrite une fois, relue par le client
 
