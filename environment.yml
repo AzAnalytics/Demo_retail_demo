@@ -1,0 +1,11 @@
+# Les paquets de l'application quand elle tourne DANS Snowflake
+# (Streamlit in Snowflake). Snowflake ignore requirements.txt : il installe
+# ce fichier, et uniquement depuis son propre canal Anaconda.
+#
+# streamlit, pandas et numpy sont déjà fournis par l'environnement Snowflake,
+# on ne déclare donc que ce qui manque.
+name: sf_env
+channels:
+  - snowflake
+dependencies:
+  - plotly
