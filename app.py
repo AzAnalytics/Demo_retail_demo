@@ -471,6 +471,11 @@ if autorise_a("diagnostic"):
         origine = (Path(str(config.DATA_FILE)).name
                    if source in ("csv", "excel") else source)
         lignes = f"{len(df):,}".replace(",", " ")
+        import plotly as _plotly        # juste pour la version affichée
+        versions = (f"Streamlit {st.__version__}, pandas {pd.__version__}, "
+                    f"Plotly {_plotly.__version__}")
+        types = ", ".join(f"{c} : {d[c].dtype}" for c in ("ca", "marge", "mois")
+                          if c in d.columns)
         gauche_t, droite_t = st.columns(2)
         gauche_t.markdown(
             "\n".join([
@@ -489,6 +494,10 @@ if autorise_a("diagnostic"):
                 f"**Profils chargés** : {len(PROFILS) if PROFILS else 'aucun'}",
             ])
         )
+        # Les versions et les types : ce sont eux qui expliquent une figure
+        # qui ne rend pas pareil d'un hébergement à l'autre.
+        st.caption(f"Versions : {versions}")
+        st.caption(f"Types des colonnes : {types}")
 
 if autorise_a("administrer") and PROFILS:
     with st.expander("👤 Comptes et périmètres"):
