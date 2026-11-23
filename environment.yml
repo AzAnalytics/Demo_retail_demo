@@ -2,10 +2,15 @@
 # (Streamlit in Snowflake). Snowflake ignore requirements.txt : il installe
 # ce fichier, et uniquement depuis son propre canal Anaconda.
 #
-# streamlit, pandas et numpy sont déjà fournis par l'environnement Snowflake,
-# on ne déclare donc que ce qui manque.
+# ATTENTION à la version de Streamlit : le moteur d'exécution de Snowflake
+# démarre par défaut sur Streamlit 1.22.0, qui date d'avril 2023. Sans la
+# ligne ci-dessous, l'application plante sur les fonctions récentes (icônes,
+# largeurs) et les figures Plotly sont mal rendues, parce que 1.22 a été
+# écrit pour Plotly 5 et qu'on lui sert Plotly 7.
+# Le catalogue Snowflake propose jusqu'à 1.52.2 : on la demande explicitement.
 name: sf_env
 channels:
   - snowflake
 dependencies:
-  - plotly
+  - streamlit=1.52.2
+  - plotly=7.1.0
