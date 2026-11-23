@@ -6,6 +6,7 @@ Démonstrateur de l'offre "Le Cockpit" — Alexis Zueras.
 
 Lancer :  streamlit run app.py
 """
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -37,9 +38,36 @@ if st.session_state.pop(acces.CLEF_DEBARQUEMENT, False):
     splash("Le Cockpit", sous_titre="Fin de session · à bientôt",
            duree=1.8, once=False, eyebrow="DÉBARQUEMENT")
 
+def dans_snowflake() -> bool:
+    """L'application tourne-t-elle à l'intérieur de Snowflake ?"""
+    try:
+        from snowflake.snowpark.context import get_active_session
+
+        get_active_session()
+        return True
+    except Exception:
+        return False
+
+
+def fichier_profils() -> str | None:
+    """Où lire les comptes, selon l'endroit où l'application tourne.
+
+    Dans Snowflake, la démonstration des rôles est justement ce qu'on vient y
+    voir : on charge les comptes livrés avec le dépôt. Ailleurs, on ne lit que
+    `profils.json`, qui n'est jamais versionné, pour que la vitrine publique
+    reste ouverte au premier visiteur venu.
+    """
+    if os.environ.get("COCKPIT_PROFILS"):
+        return None          # la variable d'environnement a la priorité
+    if dans_snowflake():
+        demo = Path(__file__).with_name("profils.demo.json")
+        return str(demo) if demo.exists() else None
+    return None
+
+
 # Verrou : connexion nominative s'il existe un fichier de profils, sinon mot de
 # passe unique s'il est configuré, sinon rien (c'est le cas de la démonstration).
-PROFILS = perm.charge_profils()
+PROFILS = perm.charge_profils(fichier_profils())
 autorise, profil = acces.session(PROFILS, config.ACCESS_PASSWORD,
                                  enseigne="Maison Lauret")
 if not autorise:

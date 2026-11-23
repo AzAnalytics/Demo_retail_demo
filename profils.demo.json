@@ -1,0 +1,33 @@
+{
+  "_lisez_moi": [
+    "Comptes de DEMONSTRATION, sur des ventes fictives. Mot de passe : cockpit2026.",
+    "Ils ne servent qu a montrer les roles et les perimetres dans Snowflake.",
+    "Chez un client, on cree profils.json (jamais versionne) avec ses propres comptes."
+  ],
+  "profils": [
+    {
+      "identifiant": "direction",
+      "nom": "Direction",
+      "role": "admin",
+      "empreinte": "pbkdf2_sha256$240000$aiVCHaif7fR4ofD791ZyfA==$zW42ZZ/e+11ii6CKQnSh86eeBIlxEhyRJFPtrmKEbX8="
+    },
+    {
+      "identifiant": "toulouse",
+      "nom": "Responsable Toulouse",
+      "role": "contributeur",
+      "magasins": [
+        "Toulouse"
+      ],
+      "empreinte": "pbkdf2_sha256$240000$BJaI5DQFI6TKIK0XMlUObw==$YqTb/2YJHxXE9Cl3ioANUKRudJflJa2QH5FmodaO0OI="
+    },
+    {
+      "identifiant": "vendeur",
+      "nom": "Vendeur Auch",
+      "role": "lecteur",
+      "magasins": [
+        "Auch"
+      ],
+      "empreinte": "pbkdf2_sha256$240000$5GqKrk+3PxpuoxQgNsxe8g==$O9Yk2MEW2UA5JDQYddApNGtpedUnnd88Cf0dmXrUpLE="
+    }
+  ]
+}
