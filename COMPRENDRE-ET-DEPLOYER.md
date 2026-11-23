@@ -184,20 +184,34 @@ premiers se voient en rendez-vous.
 Ton dépôt public `AzAnalytics/Demo_retail_demo` contient déjà tout le nécessaire
 (sauf le dossier `version-web`, qui n'est que sur ton disque).
 
-### Voie A, remettre en ligne ce soir : Streamlit Community Cloud
+### Voie A, en place : Streamlit Community Cloud
 
-Gratuit, dix minutes, c'est ce qui était en place.
+**Adresse publique : https://maison-lauret-demo.streamlit.app**
+(l'ancienne, `demoretaildemo.streamlit.app`, a été renommée et ne répond plus.)
 
-1. Va sur `share.streamlit.io` et connecte-toi avec ton compte GitHub.
-2. Regarde si l'application `Demo_retail_demo` est encore listée. Si oui, elle est
-   en pause : un bouton la relance. Si non, elle a été supprimée.
-3. Si elle a disparu : « New app », dépôt `AzAnalytics/Demo_retail_demo`, branche
-   `main`, fichier `app.py`, et tu choisis l'adresse.
+État au 23/11/2026 : l'application tourne sur la branche `main`, elle est
+publique et accessible sans connexion. Gratuit, et c'est ce qu'il faut pour une
+vitrine.
 
-Limite à connaître : l'application s'endort après quelques heures sans visite, et
-le premier visiteur attend trente secondes de réveil. C'est exactement pour ça
-que tu avais ajouté la tâche de réveil. L'adresse se termine par
-`.streamlit.app` et la page affiche la mention Streamlit.
+Pour la mettre à jour : il suffit de pousser sur `main`, Streamlit reconstruit
+tout seul.
+
+**La limite, et comment on la traite** : sans visite pendant environ douze
+heures, l'application s'endort, et le visiteur suivant voit une page « Zzzz »
+avec un bouton, puis attend une trentaine de secondes. Trois réponses, de la
+plus simple à la plus solide :
+
+1. **La tâche de réveil**, déjà écrite dans ce dépôt
+   (`.github/workflows/reveil-streamlit.yml`) : elle ouvre l'application trois
+   fois par jour avec un vrai navigateur. Attention, elle a été **désactivée à
+   la main** le 4 novembre : à réactiver dans l'onglet Actions de GitHub, bouton
+   « Enable workflow ». Un simple ping HTTP ne suffit pas, Streamlit compte les
+   sessions, d'où le navigateur.
+2. **La page statique** (`version-web/`) sur ton propre site : aucun serveur,
+   aucune veille, aucun coût, mais les données sont figées à l'export.
+3. **Google Cloud Run** avec une instance minimale maintenue (voie B) : plus de
+   veille du tout, adresse à ton domaine, pour quelques euros par mois. C'est la
+   réponse à garder pour le lien que tu envoies à un prospect sérieux.
 
 ### Voie B, la version que tu envoies en rendez-vous : Google Cloud Run
 

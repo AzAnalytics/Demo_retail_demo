@@ -39,7 +39,7 @@ Fichier : `ventes_maison_lauret.csv`
 ## ➡️ Prochaines étapes
 - [x] Choisir l'outil → **Streamlit** (Mac-friendly, met Python en avant)
 - [x] Construire le dashboard orienté dirigeant → `app.py` (5 onglets, KPI, alertes, Plotly, export)
-- [x] **Le mettre en ligne** → 🔗 https://demoretaildemo.streamlit.app
+- [x] **Le mettre en ligne** → 🔗 https://maison-lauret-demo.streamlit.app
 - [ ] En tirer le post étude de cas → [[02 - Domaines/Création/Post - Démo Retail (étude de cas)]]
 - [ ] Ajouter le lien dans toutes les bios (LinkedIn, Malt, Insta, GitHub)
 
