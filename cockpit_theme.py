@@ -203,6 +203,11 @@ def apply_theme() -> None:
         background:#FFFFFF !important; color:var(--ink) !important; }}
     [data-testid="stExpander"] {{ background:#FFFFFF; }}
     .stTabs [data-baseweb="tab-list"] {{ background:transparent !important; }}
+    .stTabs [data-baseweb="tab"] {{ background:transparent !important; }}
+    .stDownloadButton button p, .stButton button p,
+    .stDownloadButton button span, .stButton button span {{ color:#FFFFFF !important; }}
+    /* Plotly : l'hôte sombre repeint le texte des figures en clair */
+    .stPlotlyChart text, .stPlotlyChart .legendtext {{ fill:var(--ink) !important; }}
     .stTabs [data-baseweb="tab"] p {{ color:var(--muted) !important; }}
     .stTabs [aria-selected="true"] p {{ color:var(--navy) !important; }}
 
