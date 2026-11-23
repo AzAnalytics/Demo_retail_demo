@@ -64,8 +64,12 @@ def plotly_layout(fig, hauteur: int = 360):
                    font=dict(family="'Playfair Display', Georgia, serif",
                              color=COCKPIT["navy"], size=16)),
         colorway=COCKPIT_SEQ,
-        hoverlabel=dict(bgcolor=COCKPIT["navy"], font_color="#FFFFFF",
-                        font_family="Inter, sans-serif"),
+        # Infobulle claire : une carte blanche à filet or, texte foncé. Le
+        # fond sombre d'origine devenait un carré noir illisible dès qu'un
+        # hôte repeignait le texte des figures (voir le CSS du thème).
+        hoverlabel=dict(bgcolor="#FFFFFF", bordercolor=COCKPIT["gold"],
+                        font_color=COCKPIT["ink"],
+                        font_family="Inter, sans-serif", font_size=13),
     )
     fig.update_xaxes(showgrid=False, linecolor="#E4DFD3", zeroline=False)
     fig.update_yaxes(gridcolor="#ECE7DB", zeroline=False)
@@ -208,6 +212,9 @@ def apply_theme() -> None:
     .stDownloadButton button span, .stButton button span {{ color:#FFFFFF !important; }}
     /* Plotly : l'hôte sombre repeint le texte des figures en clair */
     .stPlotlyChart text, .stPlotlyChart .legendtext {{ fill:var(--ink) !important; }}
+    /* L'infobulle est claire, son texte doit rester foncé et lisible. */
+    .stPlotlyChart .hoverlayer text, .stPlotlyChart .hovertext text {{
+        fill:var(--ink) !important; }}
     .stTabs [data-baseweb="tab"] p {{ color:var(--muted) !important; }}
     .stTabs [aria-selected="true"] p {{ color:var(--navy) !important; }}
 
