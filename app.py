@@ -470,12 +470,15 @@ with t_prev:
 # EXPORT
 # ==================================================================
 st.divider()
-if autorise_a("exporter"):
-    st.download_button("⬇️ Télécharger les données filtrées (CSV)",
-                       data=d.to_csv(index=False).encode("utf-8"),
-                       file_name="export_maison_lauret.csv", mime="text/csv")
-else:
-    st.caption("L'export des données n'est pas ouvert à votre profil.")
+# L'export n'existe que si on l'a demandé (config.EXPORT_AUTORISE), et alors
+# seulement pour les profils qui en ont le droit.
+if config.EXPORT_AUTORISE:
+    if autorise_a("exporter"):
+        st.download_button("⬇️ Télécharger les données filtrées (CSV)",
+                           data=d.to_csv(index=False).encode("utf-8"),
+                           file_name="export_maison_lauret.csv", mime="text/csv")
+    else:
+        st.caption("L'export des données n'est pas ouvert à votre profil.")
 
 # ==================================================================
 # PANNEAUX RÉSERVÉS (diagnostic, administration)

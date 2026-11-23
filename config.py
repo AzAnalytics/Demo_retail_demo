@@ -89,6 +89,12 @@ _PARAMETRES_PAR_SOURCE = {
 }
 SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})
 
+# Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
+# renvoie vers Excel contredit la promesse du produit, et personne ne
+# télécharge les ventes d'une boutique fictive. Chez un client, on le met à 1 :
+# il devient alors visible pour les profils qui ont le droit « exporter ».
+EXPORT_AUTORISE = _get("COCKPIT_EXPORT", "0") not in ("0", "false", "False", "")
+
 # Démonstration : refabriquer le fichier de ventes quand il devient périmé.
 # À mettre à 0 le jour où l'écran tourne sur les vraies données d'un client :
 # on ne régénère évidemment jamais les données de quelqu'un.

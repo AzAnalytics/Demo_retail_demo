@@ -275,6 +275,7 @@ def test_a_l_ecran_un_lecteur_n_a_pas_le_bouton_d_export(tmp_path, monkeypatch):
          "empreinte": perm.empreinte("secret", iterations=1000)},
     ])
     monkeypatch.setenv("COCKPIT_PROFILS", str(chemin))
+    monkeypatch.setenv("COCKPIT_EXPORT", "1")     # export ouvert, comme chez un client
     importlib.reload(config)
     st.cache_data.clear()
     try:

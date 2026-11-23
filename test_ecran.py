@@ -84,6 +84,15 @@ def test_le_decrochage_textile_remonte_en_alerte(ecran: AppTest):
     assert "€" in textes, "l'alerte doit chiffrer la perte en euros"
 
 
+def test_la_demonstration_n_affiche_aucun_bouton_d_export(ecran: AppTest):
+    """Sur une vitrine, un bouton qui renvoie vers Excel contredit la promesse.
+
+    L'export existe toujours, mais il faut le demander (COCKPIT_EXPORT=1), et
+    il reste alors soumis au droit « exporter ».
+    """
+    assert not ecran.download_button
+
+
 def test_l_onglet_prevision_previent_qu_il_ignore_les_filtres(ecran: AppTest):
     assert any("sans tenir compte des filtres" in i.value for i in ecran.info)
 

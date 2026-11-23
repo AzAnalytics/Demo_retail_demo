@@ -486,9 +486,20 @@
       b.addEventListener("click", function () { select(i); });
       bar.appendChild(b); TABS.push(b);
     });
-    ROOT.querySelector("[data-f=dl]").textContent = "↓ " + T.dl;
     ROOT.querySelector("[data-f=foot]").textContent = T.foot;
-    ROOT.querySelector("[data-f=dl]").addEventListener("click", download);
+    // L'export ne s'affiche que si la page le demande : <div id="cockpit"
+    // data-export="1">. Sur une vitrine on le retire, parce qu'un bouton qui
+    // renvoie vers Excel contredit la promesse du produit, et que personne ne
+    // telecharge les ventes d'une boutique fictive.
+    var dl = ROOT.querySelector("[data-f=dl]");
+    if (dl) {
+      if (ROOT.getAttribute("data-export") === "1") {
+        dl.textContent = "↓ " + T.dl;
+        dl.addEventListener("click", download);
+      } else {
+        dl.parentNode.removeChild(dl);
+      }
+    }
   }
   var current = 0;
   /* affiche ou masque un element : on agit sur l'attribut ET sur le style en ligne,
