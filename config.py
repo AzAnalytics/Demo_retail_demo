@@ -51,6 +51,42 @@ OBJECTIF_CROISSANCE = float(_get("COCKPIT_OBJECTIF_CROISSANCE", "1.08"))  # +8 %
 SEUIL_ALERTE = float(_get("COCKPIT_SEUIL_ALERTE", "10"))                  # % de variation
 HORIZON_PREVISION = int(_get("COCKPIT_HORIZON_PREVISION", "12"))          # mois
 
+# TVA : les prix du fichier de caisse sont des prix boutique, donc TTC. Tout ce
+# qui est affiché (chiffre d'affaires, marge, panier moyen) est ramené hors
+# taxes, parce que c'est la seule base dont parlent un dirigeant et son
+# expert-comptable. Le coût d'achat, lui, est déjà hors taxes : le commerçant
+# récupère la TVA qu'il paie à ses fournisseurs.
+# Mettre 0 si le fichier d'un client contient déjà des prix hors taxes.
+TAUX_TVA = float(_get("COCKPIT_TAUX_TVA", "0.20"))
+
+# ------------------------------------------------------------------
+# D'où viennent les ventes (voir source_donnees.py et BASES-DE-DONNEES.md)
+# ------------------------------------------------------------------
+# csv (défaut) | excel | sqlite | oracle | odbc | postgres | sqlserver
+SOURCE = _get("COCKPIT_SOURCE", "csv")
+
+# La requête SQL qui renvoie les colonnes du Cockpit. À écrire une fois par
+# client, et à faire relire par son informaticien : c'est le contrat.
+SOURCE_REQUETE = _get("COCKPIT_SOURCE_REQUETE", "")
+
+# Les identifiants ne sont jamais écrits ici : ils viennent de l'environnement
+# ou du fichier .env local, qui n'est pas versionné.
+_PARAMETRES_PAR_SOURCE = {
+    "sqlite": {"chemin": _get("COCKPIT_DB_FICHIER", "")},
+    "oracle": {"utilisateur": _get("COCKPIT_DB_UTILISATEUR", ""),
+               "mot_de_passe": _get("COCKPIT_DB_MOTDEPASSE", ""),
+               "dsn": _get("COCKPIT_DB_DSN", "")},
+    "odbc": {"chaine": _get("COCKPIT_DB_CHAINE", "")},
+    "postgres": {"url": _get("COCKPIT_DB_URL", "")},
+    "sqlserver": {"chaine": _get("COCKPIT_DB_CHAINE", "")},
+}
+SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})
+
+# Démonstration : refabriquer le fichier de ventes quand il devient périmé.
+# À mettre à 0 le jour où l'écran tourne sur les vraies données d'un client :
+# on ne régénère évidemment jamais les données de quelqu'un.
+DEMO_AUTO = _get("COCKPIT_DEMO_AUTO", "1") not in ("0", "false", "False", "")
+
 # Vidéo du splash (logo animé Gemini)
 SPLASH_VIDEO = BASE_DIR / "assets" / _get("COCKPIT_SPLASH_VIDEO", "cockpit_logo.mp4")
 

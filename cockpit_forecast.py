@@ -11,6 +11,10 @@ Modèles candidats :
   3. Tendance log-linéaire × profil saisonnier mensuel
 
 Le meilleur est choisi par erreur de backtest (MAPE) sur les derniers mois.
+Le moteur travaille sur la colonne `ca`, en euros hors taxes : c'est l'écran
+qui a converti les prix boutique (voir config.TAUX_TVA). Prévoir du TTC
+donnerait une courbe juste et un chiffre que le dirigeant ne reconnaîtrait pas.
+
 Aucune donnée réelle client : conçu pour la démo Maison Lauret et réutilisable.
 """
 from __future__ import annotations
@@ -39,7 +43,7 @@ def _ridge_predict(w: np.ndarray, X: np.ndarray) -> np.ndarray:
 # ==================================================================
 def serie_mensuelle(df: pd.DataFrame, group_col: str | None = None,
                     entity: str | None = None,
-                    date_col: str = "date", val_col: str = "ca_ttc") -> pd.Series:
+                    date_col: str = "date", val_col: str = "ca") -> pd.Series:
     """Agrège les transactions en série mensuelle de CA (filtrée sur une entité)."""
     d = df
     if group_col and entity is not None:
@@ -149,14 +153,14 @@ def _bande(s: pd.Series, horizon: int, fut_idx) -> float:
 
 
 def prevoir(df: pd.DataFrame, group_col: str | None = None, entity: str | None = None,
-            horizon: int = 12) -> dict:
+            horizon: int = 12, val_col: str = "ca") -> dict:
     """
     Prévision de CA pour une entité (globale si group_col=None).
 
     Retour : dict avec history, forecast, lower, upper (Series), model (str),
     mape (float %), growth (%), total_next, total_prev.
     """
-    s = serie_mensuelle(df, group_col, entity)
+    s = serie_mensuelle(df, group_col, entity, val_col=val_col)
     s = s[s.index.notna()]
     nom, fn, mape = _choisir_modele(s)
     fc = fn(s, horizon)
@@ -181,11 +185,12 @@ def prevoir(df: pd.DataFrame, group_col: str | None = None, entity: str | None =
     }
 
 
-def recap_entites(df: pd.DataFrame, group_col: str, horizon: int = 12) -> pd.DataFrame:
+def recap_entites(df: pd.DataFrame, group_col: str, horizon: int = 12,
+                  val_col: str = "ca") -> pd.DataFrame:
     """Tableau récap : par entité, CA prévu 12 mois, croissance %, modèle, fiabilité."""
     lignes = []
     for ent in sorted(df[group_col].dropna().unique()):
-        r = prevoir(df, group_col, ent, horizon)
+        r = prevoir(df, group_col, ent, horizon, val_col=val_col)
         lignes.append({
             group_col.capitalize(): ent,
             "CA prévu 12 mois": round(r["total_next"]),

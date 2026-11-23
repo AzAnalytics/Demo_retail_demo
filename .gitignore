@@ -15,6 +15,10 @@ __pycache__/
 *.env
 .streamlit/secrets.toml
 
+# Les comptes et périmètres d'un client (empreintes de mots de passe)
+profils.json
+!profils.example.json
+
 # Logs / temporaires
 st.log
 *.log
