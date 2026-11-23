@@ -46,6 +46,17 @@ if not autorise:
     st.stop()
 
 
+def reglage(nom: str, defaut=None):
+    """Un réglage de config.py, tolérant à un module pas encore rechargé.
+
+    Quand on pousse une nouvelle version, l'hébergeur recharge `app.py` avant
+    `config.py` : pendant quelques secondes, l'écran demande un réglage qui
+    n'existe pas encore dans le module en mémoire, et il plante. Un réglage
+    tout neuf ne doit jamais pouvoir casser une page déjà en ligne.
+    """
+    return getattr(config, nom, defaut)
+
+
 def autorise_a(droit: str) -> bool:
     """Sans fichier de profils (démonstration publique), tout est permis."""
     return profil is None or profil.peut(droit)
@@ -131,7 +142,9 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool):
 
 
 # Les réglages passent en argument : le cache se renouvelle quand ils changent.
-df, probleme = charger_donnees(str(config.DATA_FILE), config.TAUX_TVA, config.DEMO_AUTO)
+df, probleme = charger_donnees(str(config.DATA_FILE),
+                               reglage("TAUX_TVA", 0.20),
+                               reglage("DEMO_AUTO", True))
 if probleme:
     st.error(probleme, icon="🚫")
     st.caption("Le Cockpit préfère ne rien afficher plutôt que d'afficher un chiffre faux.")
@@ -472,7 +485,7 @@ with t_prev:
 st.divider()
 # L'export n'existe que si on l'a demandé (config.EXPORT_AUTORISE), et alors
 # seulement pour les profils qui en ont le droit.
-if config.EXPORT_AUTORISE:
+if reglage("EXPORT_AUTORISE", False):
     if autorise_a("exporter"):
         st.download_button("⬇️ Télécharger les données filtrées (CSV)",
                            data=d.to_csv(index=False).encode("utf-8"),
@@ -499,8 +512,8 @@ if autorise_a("diagnostic"):
             "\n".join([
                 f"**Source** : {source}",
                 f"**Fichier ou base** : {origine}",
-                f"**TVA appliquée** : {config.TAUX_TVA * 100:.0f} %",
-                f"**Régénération auto** : {'oui' if config.DEMO_AUTO else 'non'}",
+                f"**TVA appliquée** : {reglage('TAUX_TVA', 0.20) * 100:.0f} %",
+                f"**Régénération auto** : {'oui' if reglage('DEMO_AUTO', True) else 'non'}",
             ])
         )
         droite_t.markdown(
