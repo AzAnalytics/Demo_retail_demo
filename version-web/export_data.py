@@ -19,13 +19,20 @@ REPO = Path(sys.argv[1]).resolve()
 OUT = Path(sys.argv[2]).resolve()
 sys.path.insert(0, str(REPO))
 
-import cockpit_forecast as cf  # noqa: E402  (apres l'ajout au sys.path)
+import cockpit_calculs as cal  # noqa: E402  (apres l'ajout au sys.path)
+import cockpit_forecast as cf  # noqa: E402
 
 OBJECTIF_CROISSANCE = 1.08
 SEUIL_ALERTE = 10.0
 HORIZON = 12
 
+# Les prix du fichier de caisse sont des prix boutique, donc TTC. Tout ce qui
+# est publie est hors taxes, exactement comme dans l'application : les deux
+# supports doivent annoncer le meme taux de marge.
+TAUX_TVA = 0.20
+
 df = pd.read_csv(REPO / "ventes_maison_lauret.csv", parse_dates=["date"])
+df = cal.montants_hors_taxes(df, TAUX_TVA)
 
 stores = sorted(df["magasin"].unique())
 cats = sorted(df["categorie"].unique())
@@ -43,7 +50,7 @@ cols = {
     "p": d["produit"].map({p: i for i, p in enumerate(prods)}).astype(int).tolist(),
     "q": d["quantite"].astype(int).tolist(),
     # montants en centimes : des entiers, donc un JSON plus leger et pas d'erreur de virgule
-    "ca": (d["ca_ttc"] * 100).round().astype(int).tolist(),
+    "ca": (d["ca"] * 100).round().astype(int).tolist(),
     "mg": (d["marge"] * 100).round().astype(int).tolist(),
 }
 
@@ -98,6 +105,7 @@ data = {
         "objectif": OBJECTIF_CROISSANCE,
         "seuil": SEUIL_ALERTE,
         "horizon": HORIZON,
+        "tva": TAUX_TVA,
     },
     "cols": cols,
     "forecast": forecast,

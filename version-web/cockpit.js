@@ -21,7 +21,7 @@
       },
       prevYear: "au même mois un an avant", prevMonth: "au mois précédent disponible",
       vsYear: "vs même mois un an avant", vsMonth: "vs mois précédent disponible",
-      ca: "Chiffre d'affaires", marge: "Marge", taux: "Taux de marge", panier: "Panier moyen",
+      ca: "Chiffre d'affaires HT", marge: "Marge HT", taux: "Taux de marge", panier: "Panier moyen HT",
       pts: " pts", alerts: "Alertes",
       stable: "Rien à signaler ce mois-ci, tout est stable.",
       down: function (c, v, how) { return c + " recule de " + v + " % " + how + ". À regarder de près."; },
