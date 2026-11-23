@@ -9,7 +9,7 @@ chiffre d'affaires, marge, comparaison vs l'an dernier, alertes automatiques,
 analyse par magasin, par produit et par jour de la semaine.
 
 ## Aperçu des fonctionnalités
-- KPI du mois avec comparaison explicite (juin 2026 vs juin 2025)
+- KPI du mois avec comparaison explicite au même mois l'an dernier, en euros **hors taxes**
 - Alertes automatiques quand une catégorie décroche
 - Évolution mensuelle du CA par magasin (graphiques interactifs)
 - Top / flop produits, contribution à la marge par catégorie
@@ -66,8 +66,9 @@ la compétition sans changer la logique de sélection.
 ### Résultats sur les données de démo
 
 Le modèle « Saisonnier ajusté » l'emporte sur toutes les séries. Précision (backtest
-sur 3 mois) : **~97 % en global** (erreur 3,4 %) et **93–98 % par segment** (erreur
-2–7 %). La zone d'incertitude à 95 % s'élargit avec l'horizon : fiable à court terme,
+sur 3 mois) : environ **3 à 4 % d'erreur en global**, davantage par segment, parce
+qu'une petite série bouge plus. Le chiffre exact est affiché à l'écran, série par
+série : il n'y a rien à croire sur parole. La zone d'incertitude à 95 % s'élargit avec l'horizon : fiable à court terme,
 plus prudente vers la fin des 12 mois.
 
 ### API
@@ -82,6 +83,7 @@ tableau = cf.recap_entites(df, "magasin")   # récap par entité (CA prévu, cro
 ## Lancer en local
 ```bash
 pip install -r requirements.txt
+python generate_dataset.py      # rafraîchit la période (facultatif)
 streamlit run app.py
 ```
 Le dashboard s'ouvre sur http://localhost:8501
@@ -109,5 +111,37 @@ Python · Pandas · NumPy · Streamlit · Plotly
 (Prévisions codées en NumPy pur — aucune dépendance ML lourde.)
 
 ## Données
-`ventes_maison_lauret.csv` : 33 940 transactions sur 18 mois (jan. 2025 → juin 2026),
-générées par `generate_dataset.py` avec une saisonnalité réaliste.
+`ventes_maison_lauret.csv` : environ 34 000 tickets sur 18 mois, générés par
+`generate_dataset.py` avec une saisonnalité réaliste (pic de Noël, creux d'été,
+week-ends plus forts).
+
+Deux choix qui tiennent la démonstration dans le temps :
+
+- **La période glisse avec la date du jour.** Le fichier se termine toujours au
+  dernier mois complet. Pour le rafraîchir : `python generate_dataset.py`.
+- **Le décrochage du Textile est posé volontairement** sur les trois derniers
+  mois (20 % de tickets en moins). L'alerte de l'écran ne dépend donc pas du
+  hasard du tirage, et la démonstration raconte toujours la même histoire.
+
+### Prix : TTC dans le fichier, hors taxes à l'écran
+
+Le fichier contient des prix boutique, donc TTC. L'écran les ramène hors taxes
+(`config.TAUX_TVA`, 20 % par défaut), parce que c'est la base dont parlent un
+dirigeant et son expert-comptable. Le coût d'achat, lui, est déjà hors taxes :
+le commerçant récupère la TVA qu'il paie à ses fournisseurs. Mettre
+`COCKPIT_TAUX_TVA=0` pour un fichier client déjà en hors taxes.
+
+Ordres de grandeur sur 18 mois : environ 1 000 000 € de chiffre d'affaires hors
+taxes, 438 000 € de marge, soit 43,8 %, et 29,55 € de panier moyen.
+
+## Tests
+
+```bash
+python -m pytest -q
+```
+
+30 tests : les calculs (conversion hors taxes, mois de référence, indicateurs,
+alertes, objectif, prévision) dans `test_cockpit.py`, et l'écran exécuté de bout
+en bout comme le fait un visiteur dans `test_ecran.py`. Deux d'entre eux
+protègent la démonstration elle-même : ils échouent si le fichier de données est
+périmé ou si le décrochage du Textile ne se voit plus.

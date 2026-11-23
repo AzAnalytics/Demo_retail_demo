@@ -24,6 +24,7 @@ Auteur : Alexis Zueras — produit "Le Cockpit".
 from __future__ import annotations
 import base64
 import os
+import time
 import streamlit as st
 
 # ==================================================================
@@ -260,7 +261,8 @@ def splash(titre: str = "Le Cockpit",
            sous_titre: str = "",
            video: str | None = None,
            duree: float = 2.8,
-           once: bool = True) -> None:
+           once: bool = True,
+           eyebrow: str = "EMBARQUEMENT") -> None:
     """
     Affiche l'écran d'ouverture plein écran AVANT le dashboard.
 
@@ -270,6 +272,7 @@ def splash(titre: str = "Le Cockpit",
 
     L'écran se retire tout seul (pur CSS, aucun JS requis) après `duree` s.
     `once=True` : ne rejoue pas le splash sur les reruns (filtres, etc.).
+    `eyebrow` : le sur-titre, EMBARQUEMENT à l'entrée, DÉBARQUEMENT à la sortie.
     """
     if once:
         if st.session_state.get("_cockpit_splash_done"):
@@ -279,6 +282,12 @@ def splash(titre: str = "Le Cockpit",
     c = COCKPIT
     fade_start = max(duree - 0.6, 0.2)
     hold = fade_start / duree            # part visible avant fondu
+
+    # Chaque générique porte un nom unique. Sans cela, le navigateur retrouve
+    # une animation du même nom déjà jouée (par exemple l'embarquement joué
+    # plus tôt dans la même page) et considère la nouvelle comme terminée :
+    # le débarquement ne s'afficherait jamais.
+    marque = f"{int(time.time() * 1000) % 1_000_000:06d}"
     b64 = _b64_video(video) if video else None
 
     # Média central : vidéo Gemini si dispo, sinon wordmark animé
@@ -294,7 +303,7 @@ def splash(titre: str = "Le Cockpit",
           <div class="ck-fallback">
             {_logo_svg(96, c['gold'], c['gold_bright'])}
             <div class="ck-word">
-              <span class="ck-eyebrow">EMBARQUEMENT</span>
+              <span class="ck-eyebrow">{eyebrow}</span>
               <span class="ck-title">{titre}</span>
               <span class="ck-line"></span>
               {f'<span class="ck-sub">{sous_titre}</span>' if sous_titre else ''}
@@ -303,30 +312,30 @@ def splash(titre: str = "Le Cockpit",
 
     _md(f"""
     <style>
-    @keyframes ckHide {{
+    @keyframes ckHide{marque} {{
         0%, {hold*100:.0f}% {{ opacity:1; visibility:visible; }}
         100% {{ opacity:0; visibility:hidden; }}
     }}
-    @keyframes ckRise {{
+    @keyframes ckRise{marque} {{
         0% {{ opacity:0; transform:translateY(14px); }}
         100% {{ opacity:1; transform:translateY(0); }}
     }}
-    @keyframes ckDraw {{ 0% {{ width:0; }} 100% {{ width:150px; }} }}
-    @keyframes ckSpin {{ to {{ transform:rotate(360deg); }} }}
+    @keyframes ckDraw{marque} {{ 0% {{ width:0; }} 100% {{ width:150px; }} }}
+    @keyframes ckSpin{marque} {{ to {{ transform:rotate(360deg); }} }}
 
-    .cockpit-splash {{
+    .cockpit-splash.ck{marque} {{
         position:fixed; top:0; left:0; right:0; bottom:0;
         width:100vw; height:100vh; min-height:100dvh; margin:0;
         z-index:2147483647;                 /* au-dessus de tout (header, sidebar) */
         display:flex; align-items:center; justify-content:center;
         background:radial-gradient(circle at 50% 40%, {c['navy_soft']} 0%, {c['navy']} 70%);
-        animation:ckHide {duree}s ease forwards;
+        animation:ckHide{marque} {duree}s ease forwards;
     }}
-    .cockpit-splash .cockpit-mark {{ animation:ckSpin 9s linear infinite; }}
+    .cockpit-splash.ck{marque} .cockpit-mark {{ animation:ckSpin{marque} 9s linear infinite; }}
     .ck-video {{ width:min(70vw,620px); height:auto; border-radius:14px;
                  box-shadow:0 20px 60px rgba(0,0,0,.45); }}
     .ck-fallback {{ display:flex; flex-direction:column; align-items:center;
-                    gap:22px; animation:ckRise .9s ease both; }}
+                    gap:22px; animation:ckRise{marque} .9s ease both; }}
     .ck-word {{ display:flex; flex-direction:column; align-items:center; }}
     .ck-eyebrow {{ font-family:'Inter',sans-serif; font-size:.72rem; font-weight:600;
                    letter-spacing:.4em; color:{c['gold_bright']}; }}
@@ -334,11 +343,11 @@ def splash(titre: str = "Le Cockpit",
                  font-size:2.8rem; color:#fff; margin-top:6px; }}
     .ck-line {{ height:2px; width:0; margin:12px 0 4px;
                 background:linear-gradient(90deg,transparent,{c['gold']},transparent);
-                animation:ckDraw 1.1s ease .3s forwards; }}
+                animation:ckDraw{marque} 1.1s ease .3s forwards; }}
     .ck-sub {{ font-family:'Inter',sans-serif; font-size:.95rem; color:#C7D0E0;
                letter-spacing:.05em; }}
     </style>
-    <div class="cockpit-splash">
+    <div class="cockpit-splash ck{marque}">
       {media}
     </div>
     """)

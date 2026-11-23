@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Cockpit · Maison Lauret</title>
+<link rel="stylesheet" href="cockpit.css">
+<style>
+  body { margin: 0; background: #F7F3EA; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .page { max-width: 1140px; margin: 0 auto; padding: 24px 16px 60px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ====== DEBUT du bloc repris tel quel dans la page Odoo ====== -->
+<div id="cockpit" data-src="data.json">
+
+  <div class="ck-banner">
+    <div class="ck-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#B8913A" stroke-width="1.8" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5 10.8 10.8 8.5 15.5l4.7-2.3z"></path>
+      </svg>
+    </div>
+    <div>
+      <p class="ck-kicker">Le Cockpit</p>
+      <h2>Maison Lauret</h2>
+      <p data-f="subtitle">Concept store déco-maison · 3 boutiques (Toulouse, Auch, Montauban) · données de démonstration</p>
+    </div>
+  </div>
+
+  <details class="ck-filters">
+    <summary data-f="summary">Filtres</summary>
+    <div class="ck-filters-body">
+      <div class="ck-field"><span data-f="stores-label">Magasin</span><div class="ck-chips" data-f="stores"></div></div>
+      <div class="ck-field"><span data-f="cats-label">Catégorie</span><div class="ck-chips" data-f="cats"></div></div>
+      <div class="ck-field">
+        <span data-f="period-label">Période</span>
+        <div class="ck-dates">
+          <label data-f="from-label">du</label><input type="date" data-f="from">
+          <label data-f="to-label">au</label><input type="date" data-f="to">
+        </div>
+        <button type="button" class="ck-reset" data-f="reset">Tout réafficher</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="ck-empty" data-f="empty" hidden></div>
+
+  <div data-f="content">
+    <h3 class="ck-h" data-f="kpi-title"></h3>
+    <p class="ck-caption" data-f="caption"></p>
+    <div class="ck-kpis" data-f="kpis"></div>
+
+    <h4 class="ck-sub" data-f="alerts-title">Alertes</h4>
+    <div data-f="alerts"></div>
+
+    <div class="ck-tabs" role="tablist" data-f="tabs"></div>
+    <div class="ck-panel" role="tabpanel"></div>
+    <div class="ck-panel" role="tabpanel" hidden></div>
+    <div class="ck-panel" role="tabpanel" hidden></div>
+    <div class="ck-panel" role="tabpanel" hidden></div>
+    <div class="ck-panel" role="tabpanel" hidden></div>
+    <div class="ck-panel" role="tabpanel" hidden></div>
+
+    <div class="ck-foot">
+      <span data-f="foot"></span>
+      <button type="button" class="ck-dl" data-f="dl"></button>
+    </div>
+  </div>
+
+</div>
+<script src="cockpit.js" defer></script>
+<!-- ====== FIN du bloc ====== -->
+
+</div>
+</body>
+</html>

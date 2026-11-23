@@ -1,0 +1,35 @@
+{
+  "_lisez_moi": [
+    "Copier ce fichier en profils.json (non versionne) et remplacer les empreintes.",
+    "Fabriquer une empreinte : python permissions.py \"le mot de passe\"",
+    "Roles : lecteur (voir), contributeur (voir, exporter, regler), admin (tout).",
+    "Un profil sans magasins, categories ni clients voit toutes les lignes."
+  ],
+  "profils": [
+    {
+      "identifiant": "direction",
+      "nom": "Direction",
+      "role": "admin",
+      "empreinte": "pbkdf2_sha256$1000$A9xLPx7eu4kYsMVywFwyJA==$b999B4hx6GotbNHcIovcnjwJXuTRPE7cINPoMerTBUE="
+    },
+    {
+      "identifiant": "toulouse",
+      "nom": "Boutique Toulouse",
+      "role": "contributeur",
+      "magasins": [
+        "Toulouse"
+      ],
+      "empreinte": "pbkdf2_sha256$1000$xEX+U7RRQ9EPNlcPaJf1kg==$nSUlIdR/AjmBXdlJCSZ47of/t791as5Q+YKbhzib5Qk="
+    },
+    {
+      "identifiant": "commercial.nord",
+      "nom": "Commercial Nord",
+      "role": "lecteur",
+      "clients": [
+        "C001",
+        "C004"
+      ],
+      "empreinte": "pbkdf2_sha256$1000$6m3gKeIWuN1FjWh6u4Khyg==$e4SUIJdFupo2I7kPwXqo2+oLbmLol8alBBkE2wUK/78="
+    }
+  ]
+}
