@@ -57,9 +57,12 @@ splash("Le Cockpit",                             # 2. écran d'ouverture animé
 MOIS_FR, JOURS_FR = cal.MOIS_FR, cal.JOURS_FR
 
 # Couleurs magasins harmonisées à la charte navy / or
-COULEURS_MAG = {"Toulouse": COCKPIT["navy"],
-                "Auch": COCKPIT["gold"],
-                "Montauban": "#3E6D9C"}
+# Mêmes couleurs que la version web du site : Auch en navy, Montauban en
+# or, Toulouse en bleu. Un client qui voit les deux doit reconnaître la même
+# boutique à la même couleur.
+COULEURS_MAG = {"Auch": COCKPIT["navy"],
+                "Montauban": COCKPIT["gold"],
+                "Toulouse": "#3E6D9C"}
 # Valeurs par défaut : un contributeur peut les ajuster pour sa session
 # (voir le panneau « Réglages »), un lecteur ne le peut pas.
 
@@ -259,12 +262,24 @@ t_evo, t_mag, t_prod, t_hab, t_obj, t_prev = st.tabs(
 
 # ---- Évolution mensuelle par magasin ----
 with t_evo:
+    st.markdown("**Chiffre d'affaires mensuel par magasin**")
     evo = (d.groupby(["mois", "magasin"])["ca"].sum().reset_index())
     fig = px.line(evo, x="mois", y="ca", color="magasin",
                   markers=True, color_discrete_map=COULEURS_MAG,
-                  labels={"mois": "", "ca": "CA", "magasin": "Magasin"})
-    fig.update_yaxes(tickprefix="", ticksuffix=" €", tickformat=",.0f")
-    fig.update_traces(hovertemplate="%{x|%b %Y} · %{y:,.0f} €")
+                  labels={"mois": "", "ca": "", "magasin": ""})
+    # Axe en milliers (25k €) plutôt qu'en unités : un dirigeant lit un ordre
+    # de grandeur, pas sept chiffres.
+    fig.update_yaxes(ticksuffix=" €", tickformat="~s")
+    # Étiquettes de mois en français, fabriquées à la main (voir mois_court).
+    mois_axe = sorted(evo["mois"].unique())
+    pas = max(1, len(mois_axe) // 9)
+    reperes = mois_axe[::pas]
+    fig.update_xaxes(tickmode="array", tickvals=list(reperes),
+                     ticktext=[cal.mois_court(m) for m in reperes])
+    fig.update_traces(line=dict(width=2), marker=dict(size=5),
+                      hovertemplate="%{y:,.0f} €")
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                                  x=0, title=""))
     st.plotly_chart(plotly_layout(fig), width="stretch")
 
 # ---- Magasins : CA et marge ----

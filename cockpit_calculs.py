@@ -23,6 +23,8 @@ import pandas as pd
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin",
            "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
+               "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 
 # Une alerte n'est utile que si elle pèse : en dessous, c'est du bruit qui fait
 # perdre confiance. Un écart doit dépasser le seuil en pourcentage ET ce montant.
@@ -43,6 +45,16 @@ def libelle_mois(ts) -> str:
         return "—"
     ts = pd.Timestamp(ts)
     return f"{MOIS_FR[ts.month - 1]} {ts.year}"
+
+
+def mois_court(ts) -> str:
+    """« janv. 25 » : l'étiquette d'axe, en français.
+
+    Plotly écrit les mois en anglais et son changement de langue n'est pas
+    accessible depuis Streamlit. On fabrique donc les étiquettes nous-mêmes.
+    """
+    ts = pd.Timestamp(ts)
+    return f"{MOIS_COURTS[ts.month - 1]} {ts.year % 100:02d}"
 
 
 def variation(actuel: float, precedent: float, suffixe: str = "%") -> str | None:
