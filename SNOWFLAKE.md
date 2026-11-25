@@ -38,6 +38,28 @@ sur Streamlit Cloud reste la vitrine commerciale.
 > Enterprise. La vue sécurisée donne le même résultat et fonctionne partout.
 > C'est la réponse à donner si un client est en Standard.
 
+## Les chiffres se mettent à jour tout seuls
+
+L'écran relit l'entrepôt **toutes les cinq minutes**, sans que personne ne
+clique : un fragment Streamlit se réveille toutes les trente secondes, compare
+l'âge de la dernière lecture au délai, et relance la page quand il est dépassé.
+Entre deux réveils rien ne clignote, ce qui compte quand on présente.
+
+Le panneau technique indique l'ancienneté de la lecture (« lu il y a 12 s »),
+jamais une heure : l'horloge du serveur Snowflake n'est pas celle du client.
+
+Réglages, par variable d'environnement :
+
+| Variable | Défaut | Effet |
+|---|---|---|
+| `COCKPIT_FRAICHEUR_S` | 300 | délai avant relecture automatique, 0 pour désactiver |
+| `COCKPIT_MOIS_HISTORIQUE` | 36 | mois lus dans l'entrepôt, 0 pour tout |
+| `COCKPIT_TABLE_SNOWFLAKE` | `MAISON_LAURET.VENTES.VENTES_PAR_ROLE` | l'objet lu |
+
+La requête ne demande que les trente-six derniers mois. Sur la démonstration
+cela ne change rien ; chez un client qui garde dix ans de tickets, c'est la
+différence entre une seconde et une facture.
+
 ## Installer chez un client, de zéro
 
 1. **Le dépôt** (une fois) :
