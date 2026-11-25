@@ -95,6 +95,16 @@ SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})
 TABLE_SNOWFLAKE = _get("COCKPIT_TABLE_SNOWFLAKE",
                        "MAISON_LAURET.VENTES.VENTES_PAR_ROLE")
 
+# Combien de mois d'historique lire dans l'entrepôt. 0 = tout.
+# Trente-six mois suffisent au Cockpit (comparaisons à un an, prévision) et
+# évitent de lire dix ans de tickets chez un client.
+MOIS_HISTORIQUE = int(_get("COCKPIT_MOIS_HISTORIQUE", "36"))
+
+# Actualisation automatique : l'écran relit l'entrepôt tout seul au bout de ce
+# nombre de secondes, sans que personne ne clique. 0 pour ne jamais relire
+# avant un rechargement de page.
+FRAICHEUR_S = int(_get("COCKPIT_FRAICHEUR_S", "300"))
+
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
 # télécharge les ventes d'une boutique fictive. Chez un client, on le met à 1 :

@@ -7,6 +7,8 @@ Démonstrateur de l'offre "Le Cockpit" — Alexis Zueras.
 Lancer :  streamlit run app.py
 """
 import os
+import time
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -116,9 +118,9 @@ COLONNES_ATTENDUES = ("date", "magasin", "categorie", "produit", "quantite",
                       "prix_unitaire", "cout_unitaire", "ca_ttc")
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=reglage("FRAICHEUR_S", 300))
 def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
-                    magasins: tuple = ()):
+                    magasins: tuple = (), mois: int = 0):
     """Lit le fichier de caisse, le contrôle, et ramène les montants hors taxes.
 
     Renvoie (données, problème). `problème` est une phrase en français destinée
@@ -136,7 +138,8 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
     table = reglage("TABLE_SNOWFLAKE", "")
     if table and src.session_snowflake() is not None:
         try:
-            brut = src.depuis_table_snowflake(table, magasins=list(magasins))
+            brut = src.depuis_table_snowflake(table, magasins=list(magasins),
+                                              mois=mois)
             attrs = dict(brut.attrs)
             brut = cal.montants_hors_taxes(brut, taux_tva)
             brut["mois"] = brut["date"].dt.to_period("M").dt.to_timestamp()
@@ -188,10 +191,13 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
 
 
 # Les réglages passent en argument : le cache se renouvelle quand ils changent.
+FRAICHEUR = int(reglage("FRAICHEUR_S", 300))
+
 df, probleme = charger_donnees(str(config.DATA_FILE),
                                reglage("TAUX_TVA", 0.20),
                                reglage("DEMO_AUTO", True),
-                               tuple(sorted(profil.magasins)) if profil else ())
+                               tuple(sorted(profil.magasins)) if profil else (),
+                               reglage("MOIS_HISTORIQUE", 0))
 if probleme:
     st.error(probleme, icon="🚫")
     st.caption("Le Cockpit préfère ne rien afficher plutôt que d'afficher un chiffre faux.")
@@ -549,8 +555,10 @@ if autorise_a("diagnostic"):
         dans_sf = src.session_snowflake() is not None
         repli = st.session_state.get("_repli_fichier")
         if dans_sf and table_sf and not repli:
-            source, origine = "table Snowflake", table_sf
-            etiquette_origine = "Table"
+            source = "entrepôt Snowflake"
+            origine = table_sf
+            etiquette_origine = ("Vue sécurisée" if "PAR_ROLE" in table_sf.upper()
+                                 else "Table")
         else:
             etiquette_origine = "Fichier ou base"
             source = getattr(config, "SOURCE", "csv")
@@ -584,6 +592,16 @@ if autorise_a("diagnostic"):
         )
         # Les versions et les types : ce sont eux qui expliquent une figure
         # qui ne rend pas pareil d'un hébergement à l'autre.
+        if df.attrs.get("lu_a"):
+            st.caption(
+                "Lecture faite à "
+                f"{datetime.fromtimestamp(df.attrs['lu_a']):%H:%M:%S}, "
+                f"relue automatiquement toutes les {FRAICHEUR // 60} minutes."
+            )
+        if st.button("Relire maintenant", icon="🔄",
+                     help="Sans attendre la prochaine actualisation."):
+            st.cache_data.clear()
+            st.rerun()
         if st.session_state.get("_repli_fichier"):
             st.caption("Repli sur le fichier : "
                        + st.session_state["_repli_fichier"][:160])
@@ -618,5 +636,22 @@ if autorise_a("administrer") and PROFILS:
             st.code(perm.empreinte(mot), language="text")
             st.caption("À recopier dans le champ « empreinte » du profil. "
                        "Le mot de passe en clair n'est stocké nulle part.")
+
+# ------------------------------------------------------------------
+# Actualisation automatique
+# ------------------------------------------------------------------
+# Personne ne doit cliquer pour voir les chiffres du jour. Ce bloc minuscule
+# se réveille tout seul, regarde l'âge de la lecture, et relance l'écran quand
+# elle a dépassé le délai. Entre deux réveils il ne redessine que lui-même :
+# la page ne clignote pas pendant une démonstration.
+if FRAICHEUR and df.attrs.get("lu_a"):
+
+    @st.fragment(run_every=30)
+    def actualisation_automatique():
+        if time.time() - df.attrs["lu_a"] > FRAICHEUR:
+            st.cache_data.clear()
+            st.rerun(scope="app")
+
+    actualisation_automatique()
 
 footer("Le Cockpit — démonstrateur réalisé par Alexis Zueras · Data Analyst · Python / Power BI / SQL")

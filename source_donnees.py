@@ -211,6 +211,19 @@ def _litteral(valeur: str) -> str:
     return "'" + str(valeur).replace("'", "''") + "'"
 
 
+def clause_historique(mois: int = 0) -> str:
+    """Ne lire que les N derniers mois.
+
+    Sur la démonstration cela ne change rien (dix-huit mois de données), mais
+    chez un client dont la table porte dix ans de tickets, c'est la différence
+    entre une seconde et une facture. On laisse l'entrepôt écarter le reste :
+    il sait le faire sans lire les données.
+    """
+    if not mois:
+        return ""
+    return f"DATE_VENTE >= DATEADD(month, -{int(mois)}, CURRENT_DATE())"
+
+
 def clause_perimetre(magasins=None) -> str:
     """Le périmètre du compte, traduit en SQL.
 
@@ -222,7 +235,7 @@ def clause_perimetre(magasins=None) -> str:
     if not magasins:
         return ""
     liste = ", ".join(_litteral(m) for m in sorted(magasins))
-    return f"WHERE MAGASIN IN ({liste})"
+    return f"MAGASIN IN ({liste})"
 
 
 def session_snowflake():
@@ -241,12 +254,15 @@ def session_snowflake():
         return None
 
 
-def requete_tickets(table: str, magasins=None) -> str:
+def requete_tickets(table: str, magasins=None, mois: int = 0) -> str:
     """La requête telle qu'elle part dans l'entrepôt, affichable à l'écran."""
-    return REQUETE_TICKETS.format(table=table, filtre=clause_perimetre(magasins))
+    conditions = [c for c in (clause_historique(mois), clause_perimetre(magasins)) if c]
+    filtre = ("WHERE " + "\n  AND ".join(conditions)) if conditions else ""
+    return REQUETE_TICKETS.format(table=table, filtre=filtre)
 
 
-def depuis_table_snowflake(table: str, session=None, magasins=None) -> pd.DataFrame:
+def depuis_table_snowflake(table: str, session=None, magasins=None,
+                           mois: int = 0) -> pd.DataFrame:
     """Lit la table de ventes de l'entrepôt et la rend au format du Cockpit.
 
     `magasins` restreint la lecture au périmètre du compte connecté, côté SQL.
@@ -256,7 +272,7 @@ def depuis_table_snowflake(table: str, session=None, magasins=None) -> pd.DataFr
     session = session or session_snowflake()
     if session is None:
         raise SourceInvalide("l'application ne tourne pas dans Snowflake")
-    requete = requete_tickets(table, magasins)
+    requete = requete_tickets(table, magasins, mois)
     depart = time.perf_counter()
     df = session.sql(requete).to_pandas()
     duree = (time.perf_counter() - depart) * 1000
@@ -267,6 +283,7 @@ def depuis_table_snowflake(table: str, session=None, magasins=None) -> pd.DataFr
     ventes = valide(df, origine=f"la table {table}")
     ventes.attrs["requete"] = requete.strip()
     ventes.attrs["duree_ms"] = round(duree)
+    ventes.attrs["lu_a"] = time.time()        # sert à l'actualisation automatique
     return ventes
 
 

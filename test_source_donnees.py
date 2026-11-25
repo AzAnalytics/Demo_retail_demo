@@ -257,9 +257,21 @@ def test_hors_snowflake_il_n_y_a_pas_de_session():
 # ------------------------------------------------------------------
 # Le périmètre descendu dans le SQL
 # ------------------------------------------------------------------
-def test_sans_perimetre_la_requete_ne_filtre_rien():
+def test_sans_perimetre_ni_fenetre_la_requete_ne_filtre_rien():
     assert src.clause_perimetre([]) == ""
     assert "WHERE" not in src.requete_tickets("T")
+
+
+def test_la_fenetre_d_historique_part_dans_la_requete():
+    """Chez un client qui garde dix ans de tickets, on n'en lit que trois."""
+    requete = src.requete_tickets("T", mois=36)
+    assert "DATE_VENTE >= DATEADD(month, -36, CURRENT_DATE())" in requete
+
+
+def test_fenetre_et_perimetre_se_cumulent_proprement():
+    requete = src.requete_tickets("T", magasins=["Auch"], mois=12)
+    assert requete.count("WHERE") == 1
+    assert "AND MAGASIN IN ('Auch')" in requete
 
 
 def test_le_perimetre_part_dans_la_requete():
@@ -270,7 +282,7 @@ def test_le_perimetre_part_dans_la_requete():
 def test_une_apostrophe_dans_un_nom_de_magasin_ne_casse_pas_le_sql():
     """Un magasin « L'Isle-Jourdain » ne doit ni planter ni ouvrir une faille."""
     clause = src.clause_perimetre(["L'Isle-Jourdain"])
-    assert clause == "WHERE MAGASIN IN ('L''Isle-Jourdain')"
+    assert clause == "MAGASIN IN ('L''Isle-Jourdain')"
 
 
 def test_la_lecture_restreinte_passe_le_filtre_a_l_entrepot():
