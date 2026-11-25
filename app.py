@@ -155,7 +155,7 @@ COLONNES_ATTENDUES = ("date", "magasin", "categorie", "produit", "quantite",
                       "prix_unitaire", "cout_unitaire", "ca_ttc")
 
 
-@st.cache_data(ttl=reglage("FRAICHEUR_S", 300))
+@st.cache_data(ttl=reglage("FRAICHEUR_S", 0) or 3600)
 def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
                     magasins: tuple = (), mois: int = 0):
     """Lit le fichier de caisse, le contrôle, et ramène les montants hors taxes.
@@ -228,7 +228,7 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
 
 
 # Les réglages passent en argument : le cache se renouvelle quand ils changent.
-FRAICHEUR = int(reglage("FRAICHEUR_S", 300))
+FRAICHEUR = int(reglage("FRAICHEUR_S", 0))
 
 df, probleme = charger_donnees(str(config.DATA_FILE),
                                reglage("TAUX_TVA", 0.20),
@@ -699,8 +699,11 @@ if autorise_a("diagnostic"):
             # plus cher en confiance qu'elle ne rapporte en précision.
             age = max(0, int(time.time() - df.attrs["lu_a"]))
             quand = f"il y a {age} s" if age < 90 else f"il y a {age // 60} min"
-            st.caption(f"Entrepôt lu {quand}, relecture automatique toutes "
-                       f"les {FRAICHEUR // 60} minutes.")
+            suite = (f"relecture automatique toutes les {FRAICHEUR // 60} minutes"
+                     if FRAICHEUR >= 60 else
+                     "relecture à l'ouverture de la page, pour ne pas réveiller "
+                     "l'entrepôt inutilement")
+            st.caption(f"Entrepôt lu {quand}, {suite}.")
         if st.button("Relire maintenant", icon="🔄",
                      help="Sans attendre la prochaine actualisation."):
             st.cache_data.clear()
@@ -713,7 +716,8 @@ if autorise_a("diagnostic"):
         # Les contrôles tournent dans l'entrepôt, pas ici : c'est son métier,
         # et la réponse tient en une ligne au lieu de traverser le réseau.
         if dans_sf and table_sf and not repli:
-            @st.cache_data(ttl=reglage("FRAICHEUR_S", 300), show_spinner=False)
+            @st.cache_data(ttl=reglage("FRAICHEUR_S", 0) or 3600,
+                           show_spinner=False)
             def controles(objet: str):
                 try:
                     return src.controle_qualite(objet)

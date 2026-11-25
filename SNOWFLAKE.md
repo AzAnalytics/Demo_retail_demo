@@ -40,8 +40,15 @@ sur Streamlit Cloud reste la vitrine commerciale.
 
 ## Les chiffres se mettent à jour tout seuls
 
-L'écran relit l'entrepôt **toutes les cinq minutes**, sans que personne ne
-clique : un fragment Streamlit se réveille toutes les trente secondes, compare
+> **Désactivée par défaut, et c'est une décision de coût.** Une page laissée
+> ouverte réveille l'entrepôt à chaque cycle, et un réveil est facturé au
+> minimum une minute. Mesuré sur ce compte : **1,22 crédit en une heure** avec
+> l'application ouverte, soit environ 2,40 $. Sur la démonstration les données
+> ne bougent jamais : `COCKPIT_FRAICHEUR_S` vaut 0. Chez un client dont les
+> ventes arrivent en continu, le mettre à 300.
+
+Quand elle est active, l'écran relit l'entrepôt **toutes les cinq minutes**,
+sans que personne ne clique : un fragment Streamlit se réveille toutes les trente secondes, compare
 l'âge de la dernière lecture au délai, et relance la page quand il est dépassé.
 Entre deux réveils rien ne clignote, ce qui compte quand on présente.
 
@@ -52,7 +59,7 @@ Réglages, par variable d'environnement :
 
 | Variable | Défaut | Effet |
 |---|---|---|
-| `COCKPIT_FRAICHEUR_S` | 300 | délai avant relecture automatique, 0 pour désactiver |
+| `COCKPIT_FRAICHEUR_S` | 0 | délai avant relecture automatique, 0 pour désactiver |
 | `COCKPIT_MOIS_HISTORIQUE` | 36 | mois lus dans l'entrepôt, 0 pour tout |
 | `COCKPIT_TABLE_SNOWFLAKE` | `MAISON_LAURET.VENTES.VENTES_PAR_ROLE` | l'objet lu |
 
@@ -132,6 +139,12 @@ pas de copie de fichiers.
 | Le code semble ne pas se mettre à jour | Snowsight affiche un résultat de FETCH périmé | relire le résultat du `FETCH`, puis `LS @...` pour vérifier que le fichier est arrivé |
 
 ## Le coût
+
+**Le vrai poste de coût, c'est l'application ouverte, pas les requêtes.** Tant
+qu'un onglet du Cockpit est ouvert dans Snowflake, l'entrepôt reste allumé :
+mesuré à 1,22 crédit sur une heure. Fermer l'onglet après une démonstration
+vaut toutes les optimisations de requête. Pensez aussi à poser un budget dans
+Admin > Cost management, qui prévient par courriel.
 
 L'entrepôt `WH_XS` ne tourne que pendant une requête et se suspend tout seul.
 La lecture complète des 33 841 lignes prend moins d'une seconde, et

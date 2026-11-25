@@ -101,9 +101,14 @@ TABLE_SNOWFLAKE = _get("COCKPIT_TABLE_SNOWFLAKE",
 MOIS_HISTORIQUE = int(_get("COCKPIT_MOIS_HISTORIQUE", "36"))
 
 # Actualisation automatique : l'écran relit l'entrepôt tout seul au bout de ce
-# nombre de secondes, sans que personne ne clique. 0 pour ne jamais relire
-# avant un rechargement de page.
-FRAICHEUR_S = int(_get("COCKPIT_FRAICHEUR_S", "300"))
+# nombre de secondes, sans que personne ne clique.
+#
+# Par défaut 0, c'est-à-dire désactivée, et c'est une décision de coût : une
+# page laissée ouverte réveille l'entrepôt à chaque cycle, et un entrepôt
+# réveillé est facturé au moins une minute. Sur cette démonstration les
+# données ne bougent jamais, donc relire ne sert à rien. Chez un client dont
+# les ventes arrivent en continu, mettre 300 (cinq minutes).
+FRAICHEUR_S = int(_get("COCKPIT_FRAICHEUR_S", "0"))
 
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
