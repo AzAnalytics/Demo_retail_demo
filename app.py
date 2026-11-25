@@ -609,6 +609,32 @@ if autorise_a("diagnostic"):
                        + st.session_state["_repli_fichier"][:160])
         st.caption(f"Versions : {versions}")
         st.caption(f"Types des colonnes : {types}")
+        # Les contrôles tournent dans l'entrepôt, pas ici : c'est son métier,
+        # et la réponse tient en une ligne au lieu de traverser le réseau.
+        if dans_sf and table_sf and not repli:
+            @st.cache_data(ttl=reglage("FRAICHEUR_S", 300), show_spinner=False)
+            def controles(objet: str):
+                try:
+                    return src.controle_qualite(objet)
+                except Exception as erreur:
+                    return {"erreur": str(erreur)}
+
+            q = controles(table_sf)
+            if q and "erreur" not in q:
+                anomalies = (int(q["dates_manquantes"]) + int(q["montants_negatifs"])
+                             + int(q["quantites_nulles"]))
+                st.markdown("**Contrôles exécutés dans l'entrepôt**")
+                resume = (f"{int(q['lignes']):,} lignes · {int(q['magasins'])} magasins"
+                          f" · {int(q['categories'])} catégories · dernier jour "
+                          f"{pd.Timestamp(q['dernier_jour']):%d/%m/%Y}")
+                st.caption(resume.replace(",", " "))
+                detail = (f"dates manquantes : {int(q['dates_manquantes'])} · "
+                          f"montants négatifs : {int(q['montants_negatifs'])} · "
+                          f"quantités nulles ou négatives : {int(q['quantites_nulles'])}")
+                if anomalies:
+                    st.warning(f"{anomalies} ligne(s) à regarder — {detail}", icon="⚠️")
+                else:
+                    st.caption(f"Aucune anomalie — {detail}")
         # La requête, telle qu'elle part dans l'entrepôt. Un informaticien
         # veut la lire avant d'ouvrir un accès : autant la montrer.
         if df.attrs.get("requete"):

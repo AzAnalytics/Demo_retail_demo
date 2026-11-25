@@ -296,3 +296,22 @@ def test_la_duree_et_la_requete_sont_disponibles_pour_l_ecran():
     ventes = src.depuis_table_snowflake("T", session)
     assert ventes.attrs["requete"].startswith("SELECT")
     assert isinstance(ventes.attrs["duree_ms"], int)
+
+
+# ------------------------------------------------------------------
+# Les contrôles exécutés dans l'entrepôt
+# ------------------------------------------------------------------
+def test_les_controles_reviennent_sous_forme_lisible():
+    reponse = pd.DataFrame([{
+        "lignes": 33841, "dates_manquantes": 0, "montants_negatifs": 0,
+        "quantites_nulles": 0, "magasins": 3, "categories": 6,
+        "dernier_jour": pd.Timestamp("2026-10-31"),
+    }])
+    session = _FausseSession(reponse)
+    qualite = src.controle_qualite("T", session)
+    assert qualite["lignes"] == 33841 and qualite["magasins"] == 3
+    assert "COUNT_IF(CA_TTC < 0)" in session.derniere_requete
+
+
+def test_hors_snowflake_les_controles_ne_plantent_pas():
+    assert src.controle_qualite("T") == {}

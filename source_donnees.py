@@ -238,6 +238,33 @@ def clause_perimetre(magasins=None) -> str:
     return f"MAGASIN IN ({liste})"
 
 
+# Les contrôles que l'on fait exécuter par l'entrepôt plutôt qu'en Python :
+# compter trente mille lignes est son métier, et le résultat tient en une ligne
+# au lieu de traverser le réseau. C'est aussi ce qu'un informaticien demande
+# avant d'ouvrir un accès : « qu'est-ce que vous vérifiez, au juste ? »
+REQUETE_QUALITE = """
+SELECT COUNT(*)                        AS "lignes",
+       COUNT(*) - COUNT(DATE_VENTE)    AS "dates_manquantes",
+       COUNT_IF(CA_TTC < 0)            AS "montants_negatifs",
+       COUNT_IF(QUANTITE <= 0)         AS "quantites_nulles",
+       COUNT(DISTINCT MAGASIN)         AS "magasins",
+       COUNT(DISTINCT CATEGORIE)       AS "categories",
+       MAX(DATE_VENTE)                 AS "dernier_jour"
+FROM {table}
+"""
+
+
+def controle_qualite(table: str, session=None) -> dict:
+    """Les contrôles de forme, exécutés dans l'entrepôt. Dict vide si hors Snowflake."""
+    session = session or session_snowflake()
+    if session is None:
+        return {}
+    ligne = session.sql(REQUETE_QUALITE.format(table=table)).to_pandas()
+    if ligne.empty:
+        return {}
+    return {colonne: ligne[colonne].iloc[0] for colonne in ligne.columns}
+
+
 def session_snowflake():
     """La session de l'application quand elle tourne dans Snowflake, sinon None.
 
