@@ -672,6 +672,18 @@ ETIQUETTES_ROLE = {
 }
 
 
+def _apres_ecriture(texte: str, bon: bool = True) -> None:
+    """Garde le message, garde le panneau ouvert, et relance l'écran.
+
+    Sans le rechargement, la liste affichée resterait celle d'avant la
+    modification : un administrateur ne doit pas avoir à deviner si son
+    clic a été pris en compte.
+    """
+    st.session_state["_comptes_message"] = ("ok" if bon else "ko", texte)
+    st.session_state["_comptes_ouvert"] = True
+    st.rerun()
+
+
 def gestion_des_comptes(donnees: pd.DataFrame) -> None:
     """Créer, modifier et retirer des personnes, sans toucher au code.
 
@@ -701,10 +713,11 @@ def gestion_des_comptes(donnees: pd.DataFrame) -> None:
             if st.form_submit_button("Créer la personne", type="primary"):
                 try:
                     comptes.ajoute(identifiant, nom, role, mdp, magasins=perimetre)
-                    st.success(f"« {identifiant.strip().lower()} » peut maintenant "
-                               "se connecter.")
                 except comptes.CompteInvalide as erreur:
                     st.error(str(erreur), icon="🚫")
+                else:
+                    _apres_ecriture(f"« {identifiant.strip().lower()} » peut "
+                                    "maintenant se connecter.")
 
     with entretien:
         lignes = comptes.lire()
@@ -729,9 +742,10 @@ def gestion_des_comptes(donnees: pd.DataFrame) -> None:
         if st.button("Enregistrer le rôle et le périmètre", key="_enregistre"):
             try:
                 comptes.modifie(qui, role=nouveau_role, magasins=nouveau_perimetre)
-                st.success(f"« {qui} » mis à jour.")
             except comptes.CompteInvalide as erreur:
                 st.error(str(erreur), icon="🚫")
+            else:
+                _apres_ecriture(f"« {qui} » mis à jour.")
 
         st.divider()
         c3, c4 = st.columns([2, 1])
@@ -739,25 +753,29 @@ def gestion_des_comptes(donnees: pd.DataFrame) -> None:
         if c4.button("Réinitialiser", key="_bouton_reset"):
             try:
                 comptes.change_mot_de_passe(qui, neuf)
-                st.success(f"Nouveau mot de passe actif pour « {qui} ».")
             except comptes.CompteInvalide as erreur:
                 st.error(str(erreur), icon="🚫")
+            else:
+                _apres_ecriture(f"Nouveau mot de passe actif pour « {qui} ».")
 
         c5, c6 = st.columns(2)
         if c5.button("Réactiver l'accès" if not actif else "Couper l'accès",
                      key="_bascule"):
             try:
                 comptes.active(qui, not actif)
-                st.success(f"Accès {'rendu' if not actif else 'coupé'} pour « {qui} ».")
             except comptes.CompteInvalide as erreur:
                 st.error(str(erreur), icon="🚫")
+            else:
+                _apres_ecriture(f"Accès {'rendu' if not actif else 'coupé'} "
+                                f"pour « {qui} ».")
         confirme = c6.checkbox("Je veux supprimer définitivement", key="_confirme")
         if c6.button("Supprimer", key="_supprime", disabled=not confirme):
             try:
                 comptes.supprime(qui)
-                st.success(f"« {qui} » a été supprimé.")
             except comptes.CompteInvalide as erreur:
                 st.error(str(erreur), icon="🚫")
+            else:
+                _apres_ecriture(f"« {qui} » a été supprimé.")
 
         st.caption("Couper l'accès vaut mieux que supprimer : la personne ne peut "
                    "plus se connecter, et son historique reste.")
@@ -774,7 +792,14 @@ def gestion_des_comptes(donnees: pd.DataFrame) -> None:
 
 
 if autorise_a("administrer") and PROFILS:
-    with st.expander("👤 Comptes et périmètres"):
+    with st.expander("👤 Comptes et périmètres",
+                     expanded=bool(st.session_state.get("_comptes_ouvert"))):
+        # Une écriture relance la page, ce qui refermerait le panneau et
+        # ferait disparaître la confirmation sous les doigts de
+        # l'administrateur. On garde donc l'état et le message de côté.
+        message = st.session_state.pop("_comptes_message", None)
+        if message:
+            (st.success if message[0] == "ok" else st.error)(message[1])
         st.dataframe(
             pd.DataFrame([
                 {"Identifiant": p.identifiant, "Nom": p.nom, "Rôle": p.role,
