@@ -1,4 +1,12 @@
 # Ne pas embarquer ces éléments dans l'image Docker (plus léger, plus sûr)
+
+# Les comptes et les données du client : ils arrivent par un volume monté
+# sur /config au démarrage. Les mettre dans l'image serait une faute : on
+# livrerait les mots de passe d'un client avec le logiciel.
+config/
+profils.json
+
+# Environnements et caches
 venv/
 .venv/
 env/
@@ -6,13 +14,26 @@ __pycache__/
 *.py[cod]
 .git/
 .gitignore
+
+# Secrets
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+
+# Inutile en production : les tests, la version JavaScript du site,
+# l'intégration continue et l'environnement de développement.
+test_*.py
+version-web/
+.github/
+.devcontainer/
+
+# Journaux et fichiers système
 *.log
 st.log
 .DS_Store
 ._*
-.streamlit/secrets.toml
+
+# Documents sans usage dans le conteneur
 DEPLOIEMENT_GCP.md
 assets/GEMINI_logo_anime.md

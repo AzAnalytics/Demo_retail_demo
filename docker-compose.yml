@@ -1,0 +1,54 @@
+# Le Cockpit — installation chez un client, en une commande
+# ============================================================
+# Sur le serveur du client, dans le dossier du projet :
+#
+#     docker compose up -d --build        installer et démarrer
+#     docker compose logs -f              voir ce qui se passe
+#     docker compose restart              redémarrer
+#     docker compose down                 arrêter et retirer
+#
+# Pour livrer une nouvelle version : git pull, puis
+#     docker compose up -d --build
+#
+# L'écran est alors sur http://<nom-du-serveur>:8501 depuis le réseau
+# interne. On n'ouvre jamais ce port vers l'extérieur : si le client veut y
+# accéder de chez lui, cela passe par son VPN, pas par Internet.
+
+services:
+  cockpit:
+    build: .
+    image: cockpit:1.0
+    container_name: cockpit
+
+    # Le Cockpit revient tout seul après un redémarrage du serveur.
+    # C'est ce qui évite l'appel du client le lundi matin.
+    restart: unless-stopped
+
+    ports:
+      - "8501:8080"          # <port visible sur le serveur> : <port interne>
+
+    volumes:
+      # Les comptes et les données du client vivent ICI, jamais dans l'image.
+      # Changer un mot de passe ne demande donc aucune reconstruction.
+      # Lecture seule : l'application n'a pas à modifier ces fichiers.
+      - ./config:/config:ro
+
+    environment:
+      # Les comptes : voir config/LISEZ-MOI.md pour fabriquer le fichier.
+      COCKPIT_PROFILS: /config/profils.json
+
+      # Décommenter selon la mission :
+      # COCKPIT_DATA_FILE: /config/ventes.csv   # l'export du client
+      # COCKPIT_DEMO_AUTO: "0"                  # ne jamais régénérer de fausses ventes
+      # COCKPIT_FRAICHEUR_S: "300"              # relecture auto, en secondes
+      # COCKPIT_EXPORT: "1"                     # autoriser le téléchargement
+      # COCKPIT_TAUX_TVA: "0.20"
+
+      TZ: Europe/Paris
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

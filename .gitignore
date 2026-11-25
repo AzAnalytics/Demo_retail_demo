@@ -19,6 +19,11 @@ __pycache__/
 profils.json
 !profils.example.json
 
+# Le dossier monté dans Docker : comptes et données du client.
+# On versionne seulement son mode d'emploi.
+config/*
+!config/LISEZ-MOI.md
+
 # Logs / temporaires
 st.log
 *.log

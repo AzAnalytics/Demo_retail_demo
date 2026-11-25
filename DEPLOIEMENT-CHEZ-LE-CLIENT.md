@@ -148,6 +148,43 @@ pas connecté », et dans l'onglet Paramètres, « Redémarrer la tâche toutes 
 à jour : sans cette tâche, le tableau de bord disparaît un matin sans prévenir,
 et c'est le client qui s'en aperçoit.
 
+## 4 bis. La voie Docker, quand l'informatique la connaît
+
+Si le prestataire informatique du client utilise déjà Docker, c'est la voie la
+plus propre : pas de Python à installer, pas de conflit de versions, et une
+mise à jour qui tient en une commande.
+
+Sur le serveur, dans le dossier du projet :
+
+```bash
+docker compose up -d --build
+```
+
+L'écran est alors sur `http://<nom-du-serveur>:8501`, **depuis le réseau
+interne uniquement**. On n'ouvre jamais ce port vers Internet : si le client
+veut y accéder de chez lui, cela passe par son VPN.
+
+Ce qu'il faut savoir avant de s'en servir :
+
+- **Les comptes ne sont pas dans l'image.** Ils vivent dans `config/profils.json`,
+  monté en lecture seule. Changer un mot de passe ne demande donc aucune
+  reconstruction, et une image envoyée par erreur ne contient aucun accès client.
+- **Les versions sont figées** dans `requirements.txt`. Une reconstruction dans
+  six mois installera exactement le logiciel testé aujourd'hui.
+- **L'application ne tourne pas en root**, et Docker surveille sa santé toutes
+  les trente secondes : si elle ne répond plus, le conteneur redémarre seul.
+- **`restart: unless-stopped`** la relance après un redémarrage du serveur.
+
+Pour livrer une nouvelle version : `git pull` puis `docker compose up -d --build`.
+Quelques secondes d'interruption, pas davantage.
+
+Pour vérifier que tout va bien, sans ouvrir de navigateur :
+
+```bash
+docker compose ps        # la colonne STATUS doit afficher (healthy)
+docker compose logs -f   # ce que raconte l'application
+```
+
 ## 5. Vérifier que ça tient
 
 - Les journaux : `logs\cockpit-AAAA-MM-JJ.log`, un fichier par jour.

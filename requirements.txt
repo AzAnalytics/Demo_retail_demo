@@ -1,4 +1,17 @@
-streamlit>=1.40
-pandas>=2.0
-plotly>=5.18
-numpy>=1.24
+# Le Cockpit — dépendances
+# ============================================================
+# Versions FIGÉES volontairement : ce sont exactement celles sur lesquelles
+# les 116 tests passent. Une reconstruction d'image dans six mois installera
+# donc le même logiciel qu'aujourd'hui.
+#
+# On l'a appris dans Snowflake : une version de Streamlit plus ancienne que
+# prévu, et la courbe s'affichait en ligne droite. Un client ne doit pas
+# découvrir ce genre de surprise à notre place.
+#
+# Pour monter de version : changer un numéro ici, relancer `pytest`, et ne
+# livrer que si tout passe.
+
+streamlit==1.67.0
+pandas==3.1.0
+plotly==7.1.0
+numpy==2.5.4
