@@ -1,5 +1,30 @@
 # Le Cockpit dans Snowflake
 
+## Reprendre la démonstration, en trois gestes
+
+1. **Ouvrir l'application** :
+   https://app.snowflake.com/wyapyjg/rj55865/#/streamlit-apps/MAISON_LAURET.VENTES.COCKPIT
+   Rien à démarrer : l'entrepôt se rallume tout seul en quelques secondes
+   (`auto_resume`), et se rendort une minute après la fermeture.
+2. **Se connecter** avec un des comptes de la table `COMPTES` : `direction`
+   (tout voir, panneaux réservés), `toulouse`, `montauban`, `vendeur`. Le mot
+   de passe de démonstration est noté dans `profils.demo.json`.
+3. **Fermer l'onglet en partant.** C'est la seule règle qui coûte de l'argent
+   si on l'oublie : une application ouverte garde l'entrepôt allumé, mesuré à
+   1,22 crédit l'heure.
+
+Après une modification du code : `git push`, puis dans une feuille SQL
+`ALTER GIT REPOSITORY MAISON_LAURET.VENTES.DEMO_RETAIL FETCH;` en **lisant son
+résultat** (Snowsight affiche parfois celui d'avant), puis rechargement complet
+de la page avec Ctrl+Maj+R.
+
+La vitrine publique, elle, n'a rien à démarrer :
+https://maison-lauret-demo.streamlit.app
+
+En local, pour développer : `demarrer_cockpit.bat`, ou
+`streamlit run app.py`. Le Cockpit lit alors le fichier CSV, sans connexion ni
+journal : c'est voulu.
+
 L'application tourne **à l'intérieur de l'entrepôt du client** : les données ne
 sortent pas, il n'y a pas d'identifiant à stocker, pas de serveur à louer, et
 l'adresse reste sous le domaine Snowflake de l'entreprise.
