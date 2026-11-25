@@ -21,6 +21,7 @@ from cockpit_theme import (
 )
 import acces                    # verrou d'entrée quand le Cockpit tourne chez un client
 import permissions as perm      # qui voit quelles lignes (l'équivalent du RLS)
+import comptes                  # les personnes et leurs droits, dans l'entrepôt
 import cockpit_calculs as cal   # tous les calculs, testés dans test_cockpit.py
 import source_donnees as src   # fichier, table Snowflake, base du client
 import cockpit_forecast as cf
@@ -71,6 +72,22 @@ def fichier_profils() -> str | None:
 # Verrou : connexion nominative s'il existe un fichier de profils, sinon mot de
 # passe unique s'il est configuré, sinon rien (c'est le cas de la démonstration).
 PROFILS = perm.charge_profils(fichier_profils())
+COMPTES_EN_BASE = False     # les comptes sont-ils gérés depuis l'écran ?
+if dans_snowflake():
+    # Dans l'entrepôt, les comptes vivent dans une table : l'administrateur
+    # crée et retire des personnes depuis l'écran, sans toucher au code. Au
+    # tout premier démarrage la table est vide : on y recopie les comptes du
+    # fichier, sinon la première création ferait disparaître les autres.
+    try:
+        comptes.assure_table()
+        comptes.sème_les_comptes_de_demonstration(PROFILS)
+        lignes = comptes.lire()
+        if lignes:
+            PROFILS = comptes.profils_depuis_lignes(lignes)
+            COMPTES_EN_BASE = True
+    except Exception as erreur:          # droits manquants, table verrouillée
+        st.session_state["_comptes_probleme"] = str(erreur)
+
 autorise, profil = acces.session(PROFILS, config.ACCESS_PASSWORD,
                                  enseigne="Maison Lauret")
 if not autorise:
@@ -645,6 +662,117 @@ if autorise_a("diagnostic"):
                            "les lignes des autres magasins ne sortent jamais "
                            "de l'entrepôt.")
 
+# ------------------------------------------------------------------
+# Gérer les personnes depuis l'écran
+# ------------------------------------------------------------------
+ETIQUETTES_ROLE = {
+    "lecteur": "lecteur : consulte son périmètre",
+    "contributeur": "contributeur : consulte, exporte, règle l'objectif",
+    "admin": "administrateur : tout, y compris les comptes",
+}
+
+
+def gestion_des_comptes(donnees: pd.DataFrame) -> None:
+    """Créer, modifier et retirer des personnes, sans toucher au code.
+
+    Le droit est revérifié ici : une protection qui dépend de l'endroit d'où
+    on appelle la fonction n'en est pas une. Aucun rechargement de page après
+    une écriture, sinon le panneau se refermerait sous les doigts de
+    l'administrateur ; la liste est relue et réaffichée à la place.
+    """
+    if profil is not None and not profil.peut("administrer"):
+        return
+
+    magasins_connus = sorted(str(m) for m in donnees["magasin"].dropna().unique())
+    ajout, entretien = st.tabs(["➕ Ajouter une personne", "✏️ Modifier ou retirer"])
+
+    with ajout:
+        with st.form("ajout_compte", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            identifiant = c1.text_input("Identifiant", placeholder="marie")
+            nom = c2.text_input("Nom affiché", placeholder="Marie Dupont")
+            c3, c4 = st.columns(2)
+            role = c3.selectbox("Rôle", list(perm.ROLES),
+                                format_func=lambda r: ETIQUETTES_ROLE.get(r, r))
+            perimetre = c4.multiselect("Magasins (vide : tout voir)",
+                                       magasins_connus)
+            mdp = st.text_input("Mot de passe, huit caractères au minimum",
+                                type="password")
+            if st.form_submit_button("Créer la personne", type="primary"):
+                try:
+                    comptes.ajoute(identifiant, nom, role, mdp, magasins=perimetre)
+                    st.success(f"« {identifiant.strip().lower()} » peut maintenant "
+                               "se connecter.")
+                except comptes.CompteInvalide as erreur:
+                    st.error(str(erreur), icon="🚫")
+
+    with entretien:
+        lignes = comptes.lire()
+        if not lignes:
+            st.info("Aucun compte dans la table.")
+            return
+        noms = [l["identifiant"] for l in lignes]
+        qui = st.selectbox("Personne", noms, key="_compte_choisi")
+        ligne = next(l for l in lignes if l["identifiant"] == qui)
+        actif = bool(ligne.get("actif", True))
+
+        c1, c2 = st.columns(2)
+        role_actuel = ligne.get("role") or "lecteur"
+        nouveau_role = c1.selectbox(
+            "Rôle", list(perm.ROLES),
+            index=list(perm.ROLES).index(role_actuel) if role_actuel in perm.ROLES else 0,
+            format_func=lambda r: ETIQUETTES_ROLE.get(r, r), key="_role_modif")
+        nouveau_perimetre = c2.multiselect(
+            "Magasins (vide : tout voir)", magasins_connus,
+            default=[m for m in comptes._liste(ligne.get("magasins"))
+                     if m in magasins_connus], key="_perimetre_modif")
+        if st.button("Enregistrer le rôle et le périmètre", key="_enregistre"):
+            try:
+                comptes.modifie(qui, role=nouveau_role, magasins=nouveau_perimetre)
+                st.success(f"« {qui} » mis à jour.")
+            except comptes.CompteInvalide as erreur:
+                st.error(str(erreur), icon="🚫")
+
+        st.divider()
+        c3, c4 = st.columns([2, 1])
+        neuf = c3.text_input("Nouveau mot de passe", type="password", key="_mdp_reset")
+        if c4.button("Réinitialiser", key="_bouton_reset"):
+            try:
+                comptes.change_mot_de_passe(qui, neuf)
+                st.success(f"Nouveau mot de passe actif pour « {qui} ».")
+            except comptes.CompteInvalide as erreur:
+                st.error(str(erreur), icon="🚫")
+
+        c5, c6 = st.columns(2)
+        if c5.button("Réactiver l'accès" if not actif else "Couper l'accès",
+                     key="_bascule"):
+            try:
+                comptes.active(qui, not actif)
+                st.success(f"Accès {'rendu' if not actif else 'coupé'} pour « {qui} ».")
+            except comptes.CompteInvalide as erreur:
+                st.error(str(erreur), icon="🚫")
+        confirme = c6.checkbox("Je veux supprimer définitivement", key="_confirme")
+        if c6.button("Supprimer", key="_supprime", disabled=not confirme):
+            try:
+                comptes.supprime(qui)
+                st.success(f"« {qui} » a été supprimé.")
+            except comptes.CompteInvalide as erreur:
+                st.error(str(erreur), icon="🚫")
+
+        st.caption("Couper l'accès vaut mieux que supprimer : la personne ne peut "
+                   "plus se connecter, et son historique reste.")
+        st.dataframe(
+            pd.DataFrame([
+                {"Identifiant": l["identifiant"], "Nom": l["nom"],
+                 "Rôle": l["role"],
+                 "Périmètre": ", ".join(comptes._liste(l.get("magasins"))) or "tout",
+                 "Actif": "oui" if l.get("actif", True) else "non"}
+                for l in comptes.lire()
+            ]),
+            hide_index=True, width="stretch",
+        )
+
+
 if autorise_a("administrer") and PROFILS:
     with st.expander("👤 Comptes et périmètres"):
         st.dataframe(
@@ -655,15 +783,21 @@ if autorise_a("administrer") and PROFILS:
             ]),
             hide_index=True, width="stretch",
         )
-        st.caption("Les comptes se modifient dans **profils.json**, à côté du code. "
-                   "Ce fichier n'est jamais versionné.")
-        st.markdown("**Fabriquer l'empreinte d'un mot de passe**")
-        mot = st.text_input("Mot de passe à transformer", type="password",
-                            key="_empreinte")
-        if mot:
-            st.code(perm.empreinte(mot), language="text")
-            st.caption("À recopier dans le champ « empreinte » du profil. "
-                       "Le mot de passe en clair n'est stocké nulle part.")
+        if not COMPTES_EN_BASE:
+            st.caption("Les comptes se modifient dans **profils.json**, à côté du "
+                       "code. Ce fichier n'est jamais versionné.")
+            st.markdown("**Fabriquer l'empreinte d'un mot de passe**")
+            mot = st.text_input("Mot de passe à transformer", type="password",
+                                key="_empreinte")
+            if mot:
+                st.code(perm.empreinte(mot), language="text")
+                st.caption("À recopier dans le champ « empreinte » du profil. "
+                           "Le mot de passe en clair n'est stocké nulle part.")
+        else:
+            st.caption(f"Les comptes sont rangés dans la table "
+                       f"**{comptes.TABLE_COMPTES}**. Le mot de passe n'y est "
+                       "jamais écrit : seule son empreinte l'est.")
+            gestion_des_comptes(df)
 
 # ------------------------------------------------------------------
 # Actualisation automatique
