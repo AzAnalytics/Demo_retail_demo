@@ -185,3 +185,70 @@ def test_sans_pilote_odbc_le_message_est_lisible(monkeypatch):
 
 def test_la_source_odbc_est_connue():
     assert "odbc" in src.FABRIQUES
+
+
+# ------------------------------------------------------------------
+# La lecture de l'entrepôt Snowflake
+# ------------------------------------------------------------------
+class _FausseSession:
+    """Imite une session Snowpark : .sql(requete).to_pandas().
+
+    Permet de tester le chemin Snowflake sans Snowflake. Les montants sont
+    renvoyés en Decimal, comme le fait vraiment l'entrepôt.
+    """
+
+    def __init__(self, df):
+        self.df = df
+        self.derniere_requete = None
+
+    def sql(self, requete):
+        self.derniere_requete = requete
+        return self
+
+    def to_pandas(self):
+        return self.df.copy()
+
+
+def _table_snowflake() -> pd.DataFrame:
+    from decimal import Decimal
+
+    return pd.DataFrame({
+        "date": ["2026-10-05", "2026-10-06"],
+        "magasin": ["Toulouse", "Auch"],
+        "categorie": ["Textile", "Cuisine"],
+        "produit": ["Plaid laine", "Mug grès"],
+        "quantite": [Decimal("1"), Decimal("2")],
+        "prix_unitaire": [Decimal("120.00"), Decimal("12.00")],
+        "cout_unitaire": [Decimal("40.00"), Decimal("5.00")],
+        "paiement": ["CB", "Espèces"],
+        "ca_ttc": [Decimal("120.00"), Decimal("24.00")],
+    })
+
+
+def test_la_table_de_l_entrepot_donne_le_format_du_cockpit():
+    session = _FausseSession(_table_snowflake())
+    ventes = src.depuis_table_snowflake("MAISON_LAURET.VENTES.TICKETS", session)
+    # Toutes les colonnes du Cockpit sont là ; leur ordre n'a pas d'importance.
+    assert set(src.COLONNES) <= set(ventes.columns)
+    assert ventes["ca_ttc"].sum() == pytest.approx(144.0)
+    # Les décimaux de Snowflake doivent devenir des nombres ordinaires.
+    assert ventes["quantite"].dtype == "float64"
+    assert ventes["date"].iloc[0] == pd.Timestamp("2026-10-05")
+
+
+def test_la_requete_vise_la_table_demandee_et_garde_les_minuscules():
+    session = _FausseSession(_table_snowflake())
+    src.depuis_table_snowflake("MA_BASE.MON_SCHEMA.VENTES", session)
+    requete = session.derniere_requete
+    assert "FROM MA_BASE.MON_SCHEMA.VENTES" in requete
+    assert '"date"' in requete and '"ca_ttc"' in requete
+
+
+def test_une_table_vide_est_refusee_avant_affichage():
+    vide = _table_snowflake().iloc[0:0]
+    with pytest.raises(src.SourceInvalide, match="aucune ligne"):
+        src.depuis_table_snowflake("T", _FausseSession(vide))
+
+
+def test_hors_snowflake_il_n_y_a_pas_de_session():
+    assert src.session_snowflake() is None

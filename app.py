@@ -20,6 +20,7 @@ from cockpit_theme import (
 import acces                    # verrou d'entrée quand le Cockpit tourne chez un client
 import permissions as perm      # qui voit quelles lignes (l'équivalent du RLS)
 import cockpit_calculs as cal   # tous les calculs, testés dans test_cockpit.py
+import source_donnees as src   # fichier, table Snowflake, base du client
 import cockpit_forecast as cf
 import generate_dataset as gen  # la démo se régénère si elle est périmée
 import config   # variables externalisées (données, paramètres, secrets) hors du code
@@ -128,6 +129,20 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool):
     déjà hors taxes, parce que le commerçant récupère la TVA sur ses achats.
     """
     chemin = Path(chemin)
+    # Dans Snowflake, on lit l'entrepôt : c'est là que vivent les données du
+    # client, et elles n'en sortent pas. Si la table est vide ou absente, on
+    # se rabat sur le fichier plutôt que d'afficher un écran vide.
+    table = reglage("TABLE_SNOWFLAKE", "")
+    if table and src.session_snowflake() is not None:
+        try:
+            brut = src.depuis_table_snowflake(table)
+            brut = cal.montants_hors_taxes(brut, taux_tva)
+            brut["mois"] = brut["date"].dt.to_period("M").dt.to_timestamp()
+            brut["jour_sem"] = brut["date"].dt.day_of_week
+            return brut, ""
+        except Exception as erreur:        # table vide, absente, droits manquants
+            st.session_state["_repli_fichier"] = str(erreur)
+
     try:
         if demo_auto and gen.est_perime(chemin):
             # Personne ne relance le script sur un hébergement : la démonstration
@@ -526,9 +541,15 @@ if reglage("EXPORT_AUTORISE", False):
 # ==================================================================
 if autorise_a("diagnostic"):
     with st.expander("🔧 État technique"):
-        source = getattr(config, "SOURCE", "csv")
-        origine = (Path(str(config.DATA_FILE)).name
-                   if source in ("csv", "excel") else source)
+        table_sf = reglage("TABLE_SNOWFLAKE", "")
+        dans_sf = src.session_snowflake() is not None
+        repli = st.session_state.get("_repli_fichier")
+        if dans_sf and table_sf and not repli:
+            source, origine = "table Snowflake", table_sf
+        else:
+            source = getattr(config, "SOURCE", "csv")
+            origine = (Path(str(config.DATA_FILE)).name
+                       if source in ("csv", "excel") else source)
         lignes = f"{len(df):,}".replace(",", " ")
         import plotly as _plotly        # juste pour la version affichée
         versions = (f"Streamlit {st.__version__}, pandas {pd.__version__}, "
@@ -555,6 +576,9 @@ if autorise_a("diagnostic"):
         )
         # Les versions et les types : ce sont eux qui expliquent une figure
         # qui ne rend pas pareil d'un hébergement à l'autre.
+        if st.session_state.get("_repli_fichier"):
+            st.caption("Repli sur le fichier : "
+                       + st.session_state["_repli_fichier"][:160])
         st.caption(f"Versions : {versions}")
         st.caption(f"Types des colonnes : {types}")
 

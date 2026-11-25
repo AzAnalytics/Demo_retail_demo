@@ -89,6 +89,10 @@ _PARAMETRES_PAR_SOURCE = {
 }
 SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})
 
+# La table de l'entrepôt, lue quand l'application tourne dans Snowflake.
+# Vide : l'application se rabat sur le fichier livré avec le dépôt.
+TABLE_SNOWFLAKE = _get("COCKPIT_TABLE_SNOWFLAKE", "MAISON_LAURET.VENTES.TICKETS")
+
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
 # télécharge les ventes d'une boutique fictive. Chez un client, on le met à 1 :

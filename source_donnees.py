@@ -184,6 +184,56 @@ def connexion_odbc(chaine: str) -> Any:
 
 
 # ------------------------------------------------------------------
+# Quand l'application tourne DANS Snowflake
+# ------------------------------------------------------------------
+# La requête qui alimente le Cockpit depuis l'entrepôt. Les alias sont entre
+# guillemets pour garder des noms de colonnes en minuscules : Snowflake met
+# tout en majuscules sinon, et le reste du code ne reconnaîtrait rien.
+REQUETE_TICKETS = """
+SELECT DATE_VENTE     AS "date",
+       MAGASIN        AS "magasin",
+       CATEGORIE      AS "categorie",
+       PRODUIT        AS "produit",
+       QUANTITE       AS "quantite",
+       PRIX_UNITAIRE  AS "prix_unitaire",
+       COUT_UNITAIRE  AS "cout_unitaire",
+       PAIEMENT       AS "paiement",
+       CA_TTC         AS "ca_ttc"
+FROM {table}
+ORDER BY DATE_VENTE
+"""
+
+
+def session_snowflake():
+    """La session de l'application quand elle tourne dans Snowflake, sinon None.
+
+    Aucune connexion à ouvrir ni identifiant à fournir : à l'intérieur de
+    Snowflake, l'application hérite de la session de la personne connectée.
+    C'est tout l'intérêt, et c'est aussi ce qui fait que les données ne
+    sortent jamais de l'entrepôt.
+    """
+    try:
+        from snowflake.snowpark.context import get_active_session
+
+        return get_active_session()
+    except Exception:
+        return None
+
+
+def depuis_table_snowflake(table: str, session=None) -> pd.DataFrame:
+    """Lit la table de ventes de l'entrepôt et la rend au format du Cockpit."""
+    session = session or session_snowflake()
+    if session is None:
+        raise SourceInvalide("l'application ne tourne pas dans Snowflake")
+    df = session.sql(REQUETE_TICKETS.format(table=table)).to_pandas()
+    # Snowflake renvoie des décimaux : on repasse en nombres ordinaires.
+    for colonne in ("quantite", "prix_unitaire", "cout_unitaire", "ca_ttc"):
+        if colonne in df.columns:
+            df[colonne] = pd.to_numeric(df[colonne], errors="coerce").astype("float64")
+    return valide(df, origine=f"la table {table}")
+
+
+# ------------------------------------------------------------------
 # Ce que la configuration demande
 # ------------------------------------------------------------------
 # Une requête d'exemple, à adapter au schéma du client. Deux principes :
