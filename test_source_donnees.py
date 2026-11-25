@@ -252,3 +252,35 @@ def test_une_table_vide_est_refusee_avant_affichage():
 
 def test_hors_snowflake_il_n_y_a_pas_de_session():
     assert src.session_snowflake() is None
+
+
+# ------------------------------------------------------------------
+# Le périmètre descendu dans le SQL
+# ------------------------------------------------------------------
+def test_sans_perimetre_la_requete_ne_filtre_rien():
+    assert src.clause_perimetre([]) == ""
+    assert "WHERE" not in src.requete_tickets("T")
+
+
+def test_le_perimetre_part_dans_la_requete():
+    requete = src.requete_tickets("T", ["Toulouse"])
+    assert "WHERE MAGASIN IN ('Toulouse')" in requete
+
+
+def test_une_apostrophe_dans_un_nom_de_magasin_ne_casse_pas_le_sql():
+    """Un magasin « L'Isle-Jourdain » ne doit ni planter ni ouvrir une faille."""
+    clause = src.clause_perimetre(["L'Isle-Jourdain"])
+    assert clause == "WHERE MAGASIN IN ('L''Isle-Jourdain')"
+
+
+def test_la_lecture_restreinte_passe_le_filtre_a_l_entrepot():
+    session = _FausseSession(_table_snowflake())
+    src.depuis_table_snowflake("T", session, magasins=["Auch", "Toulouse"])
+    assert "WHERE MAGASIN IN ('Auch', 'Toulouse')" in session.derniere_requete
+
+
+def test_la_duree_et_la_requete_sont_disponibles_pour_l_ecran():
+    session = _FausseSession(_table_snowflake())
+    ventes = src.depuis_table_snowflake("T", session)
+    assert ventes.attrs["requete"].startswith("SELECT")
+    assert isinstance(ventes.attrs["duree_ms"], int)

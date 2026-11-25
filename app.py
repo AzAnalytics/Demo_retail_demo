@@ -117,7 +117,8 @@ COLONNES_ATTENDUES = ("date", "magasin", "categorie", "produit", "quantite",
 
 
 @st.cache_data(ttl=3600)
-def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool):
+def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
+                    magasins: tuple = ()):
     """Lit le fichier de caisse, le contrôle, et ramène les montants hors taxes.
 
     Renvoie (données, problème). `problème` est une phrase en français destinée
@@ -135,10 +136,12 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool):
     table = reglage("TABLE_SNOWFLAKE", "")
     if table and src.session_snowflake() is not None:
         try:
-            brut = src.depuis_table_snowflake(table)
+            brut = src.depuis_table_snowflake(table, magasins=list(magasins))
+            attrs = dict(brut.attrs)
             brut = cal.montants_hors_taxes(brut, taux_tva)
             brut["mois"] = brut["date"].dt.to_period("M").dt.to_timestamp()
             brut["jour_sem"] = brut["date"].dt.day_of_week
+            brut.attrs.update(attrs)
             return brut, ""
         except Exception as erreur:        # table vide, absente, droits manquants
             st.session_state["_repli_fichier"] = str(erreur)
@@ -187,7 +190,8 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool):
 # Les réglages passent en argument : le cache se renouvelle quand ils changent.
 df, probleme = charger_donnees(str(config.DATA_FILE),
                                reglage("TAUX_TVA", 0.20),
-                               reglage("DEMO_AUTO", True))
+                               reglage("DEMO_AUTO", True),
+                               tuple(sorted(profil.magasins)) if profil else ())
 if probleme:
     st.error(probleme, icon="🚫")
     st.caption("Le Cockpit préfère ne rien afficher plutôt que d'afficher un chiffre faux.")
@@ -546,7 +550,9 @@ if autorise_a("diagnostic"):
         repli = st.session_state.get("_repli_fichier")
         if dans_sf and table_sf and not repli:
             source, origine = "table Snowflake", table_sf
+            etiquette_origine = "Table"
         else:
+            etiquette_origine = "Fichier ou base"
             source = getattr(config, "SOURCE", "csv")
             origine = (Path(str(config.DATA_FILE)).name
                        if source in ("csv", "excel") else source)
@@ -560,7 +566,7 @@ if autorise_a("diagnostic"):
         gauche_t.markdown(
             "\n".join([
                 f"**Source** : {source}",
-                f"**Fichier ou base** : {origine}",
+                f"**{etiquette_origine}** : {origine}",
                 f"**TVA appliquée** : {reglage('TAUX_TVA', 0.20) * 100:.0f} %",
                 f"**Régénération auto** : {'oui' if reglage('DEMO_AUTO', True) else 'non'}",
             ])
@@ -570,7 +576,9 @@ if autorise_a("diagnostic"):
                 f"**Lignes lues** : {lignes}",
                 f"**Période** : du {df['date'].min():%d/%m/%Y} "
                 f"au {df['date'].max():%d/%m/%Y}",
-                "**Relecture** : au plus une fois par heure (cache)",
+                ("**Lecture de l'entrepôt** : "
+                 f"{df.attrs['duree_ms']} ms" if df.attrs.get("duree_ms")
+                 else "**Relecture** : au plus une fois par heure (cache)"),
                 f"**Profils chargés** : {len(PROFILS) if PROFILS else 'aucun'}",
             ])
         )
@@ -581,6 +589,15 @@ if autorise_a("diagnostic"):
                        + st.session_state["_repli_fichier"][:160])
         st.caption(f"Versions : {versions}")
         st.caption(f"Types des colonnes : {types}")
+        # La requête, telle qu'elle part dans l'entrepôt. Un informaticien
+        # veut la lire avant d'ouvrir un accès : autant la montrer.
+        if df.attrs.get("requete"):
+            st.markdown("**La requête exécutée dans l'entrepôt**")
+            st.code(df.attrs["requete"], language="sql")
+            if "WHERE" in df.attrs["requete"]:
+                st.caption("Le périmètre du compte est dans la requête : "
+                           "les lignes des autres magasins ne sortent jamais "
+                           "de l'entrepôt.")
 
 if autorise_a("administrer") and PROFILS:
     with st.expander("👤 Comptes et périmètres"):

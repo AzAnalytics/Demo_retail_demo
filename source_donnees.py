@@ -25,6 +25,7 @@ Voir `BASES-DE-DONNEES.md`.
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -200,8 +201,28 @@ SELECT DATE_VENTE     AS "date",
        PAIEMENT       AS "paiement",
        CA_TTC         AS "ca_ttc"
 FROM {table}
+{filtre}
 ORDER BY DATE_VENTE
 """
+
+
+def _litteral(valeur: str) -> str:
+    """Une chaîne SQL sûre : les apostrophes sont doublées, rien n'est concaténé."""
+    return "'" + str(valeur).replace("'", "''") + "'"
+
+
+def clause_perimetre(magasins=None) -> str:
+    """Le périmètre du compte, traduit en SQL.
+
+    C'est la différence entre « filtrer à l'écran » et « ne jamais recevoir
+    la donnée ». Un vendeur d'Auch ne doit pas avoir Toulouse dans la mémoire
+    de son navigateur : la restriction part donc dans la requête, et l'entrepôt
+    ne renvoie que ses lignes.
+    """
+    if not magasins:
+        return ""
+    liste = ", ".join(_litteral(m) for m in sorted(magasins))
+    return f"WHERE MAGASIN IN ({liste})"
 
 
 def session_snowflake():
@@ -220,17 +241,33 @@ def session_snowflake():
         return None
 
 
-def depuis_table_snowflake(table: str, session=None) -> pd.DataFrame:
-    """Lit la table de ventes de l'entrepôt et la rend au format du Cockpit."""
+def requete_tickets(table: str, magasins=None) -> str:
+    """La requête telle qu'elle part dans l'entrepôt, affichable à l'écran."""
+    return REQUETE_TICKETS.format(table=table, filtre=clause_perimetre(magasins))
+
+
+def depuis_table_snowflake(table: str, session=None, magasins=None) -> pd.DataFrame:
+    """Lit la table de ventes de l'entrepôt et la rend au format du Cockpit.
+
+    `magasins` restreint la lecture au périmètre du compte connecté, côté SQL.
+    Renvoie le tableau ; la requête et sa durée sont posées sur l'attribut
+    `.attrs`, pour être montrées dans le panneau technique.
+    """
     session = session or session_snowflake()
     if session is None:
         raise SourceInvalide("l'application ne tourne pas dans Snowflake")
-    df = session.sql(REQUETE_TICKETS.format(table=table)).to_pandas()
+    requete = requete_tickets(table, magasins)
+    depart = time.perf_counter()
+    df = session.sql(requete).to_pandas()
+    duree = (time.perf_counter() - depart) * 1000
     # Snowflake renvoie des décimaux : on repasse en nombres ordinaires.
     for colonne in ("quantite", "prix_unitaire", "cout_unitaire", "ca_ttc"):
         if colonne in df.columns:
             df[colonne] = pd.to_numeric(df[colonne], errors="coerce").astype("float64")
-    return valide(df, origine=f"la table {table}")
+    ventes = valide(df, origine=f"la table {table}")
+    ventes.attrs["requete"] = requete.strip()
+    ventes.attrs["duree_ms"] = round(duree)
+    return ventes
 
 
 # ------------------------------------------------------------------
