@@ -593,11 +593,13 @@ if autorise_a("diagnostic"):
         # Les versions et les types : ce sont eux qui expliquent une figure
         # qui ne rend pas pareil d'un hébergement à l'autre.
         if df.attrs.get("lu_a"):
-            st.caption(
-                "Lecture faite à "
-                f"{datetime.fromtimestamp(df.attrs['lu_a']):%H:%M:%S}, "
-                f"relue automatiquement toutes les {FRAICHEUR // 60} minutes."
-            )
+            # L'ancienneté plutôt que l'heure : l'horloge du serveur Snowflake
+            # n'est pas celle du client, et une heure fausse à l'écran coûte
+            # plus cher en confiance qu'elle ne rapporte en précision.
+            age = max(0, int(time.time() - df.attrs["lu_a"]))
+            quand = f"il y a {age} s" if age < 90 else f"il y a {age // 60} min"
+            st.caption(f"Entrepôt lu {quand}, relecture automatique toutes "
+                       f"les {FRAICHEUR // 60} minutes.")
         if st.button("Relire maintenant", icon="🔄",
                      help="Sans attendre la prochaine actualisation."):
             st.cache_data.clear()
@@ -612,7 +614,7 @@ if autorise_a("diagnostic"):
         if df.attrs.get("requete"):
             st.markdown("**La requête exécutée dans l'entrepôt**")
             st.code(df.attrs["requete"], language="sql")
-            if "WHERE" in df.attrs["requete"]:
+            if "MAGASIN IN" in df.attrs["requete"]:
                 st.caption("Le périmètre du compte est dans la requête : "
                            "les lignes des autres magasins ne sortent jamais "
                            "de l'entrepôt.")
