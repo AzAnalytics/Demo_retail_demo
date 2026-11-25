@@ -88,6 +88,28 @@ différence entre une seconde et une facture.
      SET TITLE = 'Le Cockpit - Maison Lauret';
    ```
 
+## Montrer l'application à quelqu'un d'extérieur
+
+Le bouton **Share** de l'application partage avec un **rôle ou une personne du
+compte Snowflake**. Il n'existe pas de lien public anonyme : pour la vitrine
+ouverte à tous, c'est la version Streamlit Cloud qui sert.
+
+Pour un prospect que l'on veut laisser essayer seul :
+
+1. Jouer `snowflake/03_partage.sql` : il crée le rôle `COCKPIT_DEMO`, qui
+   reçoit l'application et l'entrepôt, **et rien d'autre**. L'application
+   tourne avec les droits de son propriétaire : elle lit les ventes pour le
+   visiteur sans jamais les lui ouvrir.
+2. Governance & security > Users & roles > **Invite** (ou Create user), puis
+   `GRANT ROLE COCKPIT_DEMO TO USER "prenom.nom";`
+3. Sur l'application, **Share > Copy link > For app viewers** : l'écran
+   s'ouvre seul, sans la navigation Snowflake autour.
+
+Deux choses à savoir avant d'inviter : la personne devient utilisateur de ton
+compte, et sa visite consomme ton entrepôt (quelques centimes). Les comptes du
+Cockpit (direction, toulouse, vendeur) s'ajoutent par-dessus : le rôle
+Snowflake ouvre la porte de l'immeuble, le compte du Cockpit décide de l'étage.
+
 ## Mettre à jour après une modification du code
 
 ```sql
@@ -107,6 +129,7 @@ pas de copie de fichiers.
 | `COPY INTO` refusé depuis le dépôt Git | fonctionnalité non prise en charge | `INSERT ... SELECT` (fichier 01) |
 | Tout semble autorisé pendant un test de rôle | rôles secondaires actifs dans Snowsight | `USE SECONDARY ROLES NONE;` |
 | `GRANT ... TO USER prenom.nom` échoue | point dans l'identifiant | guillemets : `"prenom.nom"` |
+| Le code semble ne pas se mettre à jour | Snowsight affiche un résultat de FETCH périmé | relire le résultat du `FETCH`, puis `LS @...` pour vérifier que le fichier est arrivé |
 
 ## Le coût
 
