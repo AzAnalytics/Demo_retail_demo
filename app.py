@@ -22,6 +22,7 @@ from cockpit_theme import (
 import acces                    # verrou d'entrée quand le Cockpit tourne chez un client
 import permissions as perm      # qui voit quelles lignes (l'équivalent du RLS)
 import comptes                  # les personnes et leurs droits, dans l'entrepôt
+import journal                  # qui s'est connecté, quand, depuis quel compte
 import cockpit_calculs as cal   # tous les calculs, testés dans test_cockpit.py
 import source_donnees as src   # fichier, table Snowflake, base du client
 import cockpit_forecast as cf
@@ -88,8 +89,27 @@ if dans_snowflake():
     except Exception as erreur:          # droits manquants, table verrouillée
         st.session_state["_comptes_probleme"] = str(erreur)
 
+def note_au_journal(identifiant: str, evenement: str, role: str = "") -> None:
+    """Écrit la tentative dans le journal de l'entrepôt, sans jamais bloquer.
+
+    Hors de Snowflake la fonction ne fait rien : la vitrine publique n'a pas
+    de journal, et un écran de connexion ne doit pas dépendre d'une table.
+    """
+    try:
+        journal.enregistre(identifiant, evenement, role)
+    except Exception:
+        pass
+
+
+if dans_snowflake():
+    try:
+        journal.assure_table()
+    except Exception as erreur:
+        st.session_state["_journal_probleme"] = str(erreur)
+
 autorise, profil = acces.session(PROFILS, config.ACCESS_PASSWORD,
-                                 enseigne="Maison Lauret")
+                                 enseigne="Maison Lauret",
+                                 journal=note_au_journal)
 if not autorise:
     st.stop()
 
@@ -250,7 +270,7 @@ if profil is not None or SESSION_OUVERTE:
     else:
         qui.caption("🔒 Session ouverte.")
     with sortie:
-        acces.bouton_deconnexion()
+        acces.bouton_deconnexion(journal=note_au_journal)
 
 # --- Réglages de session (droit « reglages ») ---
 OBJECTIF_CROISSANCE = config.OBJECTIF_CROISSANCE
@@ -339,9 +359,17 @@ st.divider()
 # ==================================================================
 # ONGLETS
 # ==================================================================
-t_evo, t_mag, t_prod, t_hab, t_obj, t_prev = st.tabs(
-    ["📈 Évolution", "🏬 Magasins", "📦 Produits", "🗓️ Habitudes", "🎯 Objectif",
-     "🔮 Prévisions"])
+NOMS_ONGLETS = ["📈 Évolution", "🏬 Magasins", "📦 Produits", "🗓️ Habitudes",
+                "🎯 Objectif", "🔮 Prévisions"]
+# Le journal de connexions ne regarde pas un vendeur : il n'apparaît que pour
+# un administrateur, et seulement là où il existe, c'est-à-dire dans l'entrepôt.
+JOURNAL_VISIBLE = autorise_a("administrer") and dans_snowflake()
+if JOURNAL_VISIBLE:
+    NOMS_ONGLETS.append("🔐 Connexions")
+
+_onglets = st.tabs(NOMS_ONGLETS)
+t_evo, t_mag, t_prod, t_hab, t_obj, t_prev = _onglets[:6]
+t_journal = _onglets[6] if JOURNAL_VISIBLE else None
 
 # ---- Évolution mensuelle par magasin ----
 with t_evo:
@@ -548,6 +576,62 @@ with t_prev:
         recap["Fiabilité (MAPE)"] = recap["Fiabilité (MAPE)"].map(
             lambda v: "—" if pd.isna(v) else f"± {v:.1f} %")
         st.dataframe(recap, width="stretch", hide_index=True)
+
+# ---- Journal des connexions (administrateur seulement) ----
+if t_journal is not None:
+    with t_journal:
+        st.markdown("**Qui s'est connecté, et quand**")
+        st.caption("Chaque tentative est enregistrée dans "
+                   f"**{journal.TABLE_JOURNAL}** : les réussites, les échecs "
+                   "avec l'identifiant saisi, et les déconnexions. Le mot de "
+                   "passe n'est jamais écrit, même faux.")
+        try:
+            resume = journal.resume()
+            evenements = journal.lire(200)
+        except Exception as erreur:
+            st.error(f"Le journal n'a pas pu être lu : {erreur}", icon="🚫")
+            resume, evenements = pd.DataFrame(), pd.DataFrame()
+
+        if evenements.empty:
+            st.info("Aucune connexion enregistrée pour l'instant.")
+        else:
+            horodatages = pd.to_datetime(evenements["horodatage"])
+            depuis_7j = horodatages >= (pd.Timestamp.now() - pd.Timedelta(days=7))
+            echecs_7j = int(((evenements["evenement"] == journal.ECHEC)
+                             & depuis_7j).sum())
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Connexions réussies",
+                      int((evenements["evenement"] == journal.CONNEXION).sum()))
+            c2.metric("Échecs sur 7 jours", echecs_7j)
+            c3.metric("Personnes distinctes", evenements["identifiant"].nunique())
+            if echecs_7j >= 5:
+                st.warning(f"{echecs_7j} échecs de connexion sur les sept "
+                           "derniers jours. À regarder de près.", icon="⚠️")
+
+            if not resume.empty:
+                st.markdown("**Par personne**")
+                tableau = resume.copy()
+                tableau["derniere_connexion"] = pd.to_datetime(
+                    tableau["derniere_connexion"]).dt.strftime("%d/%m/%Y %H:%M")
+                st.dataframe(
+                    tableau.rename(columns={
+                        "identifiant": "Identifiant",
+                        "derniere_connexion": "Dernière connexion",
+                        "connexions": "Connexions",
+                        "echecs": "Échecs"}).fillna("jamais"),
+                    hide_index=True, width="stretch")
+
+            st.markdown("**Les deux cents derniers événements**")
+            detail = evenements.copy()
+            detail["horodatage"] = horodatages.dt.strftime("%d/%m/%Y %H:%M:%S")
+            st.dataframe(
+                detail.rename(columns={"horodatage": "Quand",
+                                       "identifiant": "Identifiant",
+                                       "evenement": "Événement",
+                                       "role": "Rôle"}),
+                hide_index=True, width="stretch", height=320)
+            st.caption("Les heures sont celles du serveur Snowflake, pas "
+                       "forcément les vôtres.")
 
 # ==================================================================
 # EXPORT

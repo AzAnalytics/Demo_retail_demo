@@ -166,32 +166,44 @@ CLEFS_SESSION = (CLEF_SESSION, CLEF_PROFIL, "_cockpit_mot_de_passe",
 CLEF_DEBARQUEMENT = "_cockpit_debarquement"
 
 
-def deconnecte() -> None:
+def deconnecte(journal=None) -> None:
     """Ferme la session et revient à l'écran de connexion.
 
     On pose un drapeau pour que l'écran suivant joue le générique de sortie :
     quitter le cockpit se voit, comme y entrer.
+
+    `journal` est une fonction optionnelle (identifiant, événement, rôle)
+    appelée avant d'effacer la session : c'est ainsi que le Cockpit tient
+    son journal de connexions sans que ce module connaisse Snowflake.
     """
+    if journal is not None:
+        journal(st.session_state.get(CLEF_PROFIL) or "", "déconnexion", "")
     for clef in CLEFS_SESSION:
         st.session_state.pop(clef, None)
     st.session_state[CLEF_DEBARQUEMENT] = True
     st.rerun()
 
 
-def bouton_deconnexion(conteneur=None, libelle: str = "Se déconnecter") -> None:
+def bouton_deconnexion(conteneur=None, libelle: str = "Se déconnecter",
+                       journal=None) -> None:
     """Le bouton, à placer là où la personne le cherchera."""
     cible = conteneur if conteneur is not None else st
     if cible.button(libelle, key="_bouton_deconnexion"):
-        deconnecte()
+        deconnecte(journal)
 
 
 def session(profils: dict, mot_de_passe_unique: str = "",
-            enseigne: str = "Le Cockpit") -> tuple[bool, object | None]:
+            enseigne: str = "Le Cockpit",
+            journal=None) -> tuple[bool, object | None]:
     """Ouvre la session et renvoie (autorisé, profil).
 
     Avec un fichier de profils, chacun se connecte avec son identifiant et ne
     verra que son périmètre (voir `permissions.py`). Sans fichier de profils,
     on retombe sur le mot de passe unique, et le profil vaut None.
+
+    `journal` est une fonction optionnelle (identifiant, événement, rôle),
+    appelée à chaque tentative, réussie ou non. Ce module ne sait pas où
+    elle écrit, et c'est voulu : il marche pareil sans entrepôt.
     """
     import permissions as perm
 
@@ -216,8 +228,14 @@ def session(profils: dict, mot_de_passe_unique: str = "",
         profil = perm.authentifie(saisi.strip(), mot_de_passe, profils)
         if profil is None:
             # Même message dans les deux cas : on ne dit pas si le compte existe.
+            # L'échec est journalisé avec l'identifiant saisi, jamais le mot
+            # de passe : c'est ce qui permet de voir une série de tentatives.
+            if journal is not None:
+                journal(saisi.strip(), "échec", "")
             st.error("Identifiant ou mot de passe incorrect.", icon="🔒")
             return False, None
+    if journal is not None:
+        journal(profil.identifiant, "connexion", profil.role)
     st.session_state[CLEF_PROFIL] = profil.identifiant
     # Relance immédiate : sans cela le formulaire resterait affiché au-dessus
     # du tableau de bord jusqu'à la prochaine interaction.
