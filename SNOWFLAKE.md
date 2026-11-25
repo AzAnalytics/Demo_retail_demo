@@ -1,0 +1,94 @@
+# Le Cockpit dans Snowflake
+
+L'application tourne **à l'intérieur de l'entrepôt du client** : les données ne
+sortent pas, il n'y a pas d'identifiant à stocker, pas de serveur à louer, et
+l'adresse reste sous le domaine Snowflake de l'entreprise.
+
+C'est la version à montrer à une direction informatique. La version publique
+sur Streamlit Cloud reste la vitrine commerciale.
+
+---
+
+## Ce qui est en place aujourd'hui
+
+| Objet | Nom | Rôle |
+|---|---|---|
+| Base | `MAISON_LAURET` | la démonstration |
+| Schéma | `VENTES` | |
+| Table | `TICKETS` | 33 841 lignes, du 01/05/2025 au 31/10/2026 |
+| Vue sécurisée | `VENTES_PAR_ROLE` | filtre les lignes selon le rôle Snowflake connecté |
+| Table de droits | `ACCES_MAGASIN` | la correspondance rôle → magasin |
+| Dépôt Git | `DEMO_RETAIL` | pointe sur GitHub `AzAnalytics/Demo_retail_demo` |
+| Application | `MAISON_LAURET.VENTES.COCKPIT` | « Le Cockpit - Maison Lauret » |
+| Entrepôt | `WH_XS` | X-Small, suspension automatique |
+
+## Les trois niveaux de sécurité
+
+1. **L'écran** : un compte, un mot de passe, un rôle (lecteur, contributeur,
+   administrateur). Un lecteur n'a pas le panneau technique ni l'export.
+2. **La requête** : le périmètre du compte part dans le `WHERE`. Un vendeur
+   d'Auch ne reçoit jamais les lignes de Toulouse, même dans la mémoire de son
+   navigateur. Vérifié dans l'historique Snowflake : 16 951 lignes renvoyées
+   pour le compte Toulouse, 33 841 pour la direction.
+3. **L'entrepôt** : la vue `VENTES_PAR_ROLE` filtre sur `CURRENT_ROLE()`. Même
+   en se connectant à Snowflake sans passer par le Cockpit, un rôle de magasin
+   ne voit que ses lignes, et la table brute lui est refusée.
+
+> **Édition Standard** : les `ROW ACCESS POLICY` natives demandent l'édition
+> Enterprise. La vue sécurisée donne le même résultat et fonctionne partout.
+> C'est la réponse à donner si un client est en Standard.
+
+## Installer chez un client, de zéro
+
+1. **Le dépôt** (une fois) :
+   ```sql
+   CREATE OR REPLACE API INTEGRATION GIT_HTTPS_API
+     API_PROVIDER = GIT_HTTPS_API
+     API_ALLOWED_PREFIXES = ('https://github.com/AzAnalytics')
+     ENABLED = TRUE;
+
+   CREATE OR REPLACE GIT REPOSITORY MAISON_LAURET.VENTES.DEMO_RETAIL
+     API_INTEGRATION = GIT_HTTPS_API
+     ORIGIN = 'https://github.com/AzAnalytics/Demo_retail_demo';
+   ```
+   L'adresse ne contient **qu'une fois** `https://`, l'erreur est vite faite.
+
+2. **Les données** : `snowflake/01_chargement.sql`.
+3. **La sécurité** : `snowflake/02_securite.sql`.
+4. **L'application** :
+   ```sql
+   CREATE OR REPLACE STREAMLIT MAISON_LAURET.VENTES.COCKPIT
+     ROOT_LOCATION = '@MAISON_LAURET.VENTES.DEMO_RETAIL/branches/main'
+     MAIN_FILE = 'app.py'
+     QUERY_WAREHOUSE = WH_XS;
+
+   ALTER STREAMLIT MAISON_LAURET.VENTES.COCKPIT
+     SET TITLE = 'Le Cockpit - Maison Lauret';
+   ```
+
+## Mettre à jour après une modification du code
+
+```sql
+ALTER GIT REPOSITORY MAISON_LAURET.VENTES.DEMO_RETAIL FETCH;
+```
+Puis recharger la page de l'application. Rien d'autre : pas de redéploiement,
+pas de copie de fichiers.
+
+## Les pièges rencontrés, et leur solution
+
+| Symptôme | Cause | Solution |
+|---|---|---|
+| `ModuleNotFoundError: plotly` | Snowflake ignore `requirements.txt` | `environment.yml`, canal `snowflake` |
+| Courbe en ligne droite | Streamlit 1.22 ne décode pas les tableaux base64 de Plotly 6+ | versions épinglées dans `environment.yml` |
+| `expander() got an unexpected keyword 'icon'` | Streamlit plus ancien dans Snowflake | émojis plutôt que `:material/...` |
+| Fond des onglets trop sombre | Snowflake ignore `.streamlit/config.toml` | styles dans `cockpit_theme.py` |
+| `COPY INTO` refusé depuis le dépôt Git | fonctionnalité non prise en charge | `INSERT ... SELECT` (fichier 01) |
+| Tout semble autorisé pendant un test de rôle | rôles secondaires actifs dans Snowsight | `USE SECONDARY ROLES NONE;` |
+| `GRANT ... TO USER prenom.nom` échoue | point dans l'identifiant | guillemets : `"prenom.nom"` |
+
+## Le coût
+
+L'entrepôt `WH_XS` ne tourne que pendant une requête et se suspend tout seul.
+La lecture complète des 33 841 lignes prend moins d'une seconde, et
+l'application ne relit l'entrepôt qu'une fois par heure (cache). Une
+démonstration d'une heure coûte quelques centimes de crédit.

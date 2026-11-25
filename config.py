@@ -89,9 +89,11 @@ _PARAMETRES_PAR_SOURCE = {
 }
 SOURCE_PARAMETRES = _PARAMETRES_PAR_SOURCE.get(SOURCE, {})
 
-# La table de l'entrepôt, lue quand l'application tourne dans Snowflake.
+# Ce que l'application lit dans Snowflake : une vue sécurisée, pas la table.
+# La vue filtre déjà sur le rôle Snowflake connecté (snowflake/02_securite.sql).
 # Vide : l'application se rabat sur le fichier livré avec le dépôt.
-TABLE_SNOWFLAKE = _get("COCKPIT_TABLE_SNOWFLAKE", "MAISON_LAURET.VENTES.TICKETS")
+TABLE_SNOWFLAKE = _get("COCKPIT_TABLE_SNOWFLAKE",
+                       "MAISON_LAURET.VENTES.VENTES_PAR_ROLE")
 
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
