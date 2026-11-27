@@ -232,6 +232,23 @@ Sous les indicateurs, le panneau donne aussi :
   finit par faire mentir celui qui le montre. À remettre à jour dans
   `couts.TARIFS_ENTREPOTS`.
 
+### Deux pièges de lecture, écrits dans l'écran
+
+**`CLOUD_SERVICES_ONLY` n'est pas un entrepôt.** C'est la ligne où Snowflake
+range le travail qui ne tourne sur aucun entrepôt : compilation des requêtes,
+`SHOW`, lecture des métadonnées, réponses servies par le cache de résultats.
+Elle coûte presque rien parce que Snowflake ne facture les services cloud
+**qu'au-delà de 10 % du calcul consommé dans la journée** : en dessous, c'est
+offert. Ce n'est donc pas une façon de faire tourner le Cockpit gratuitement,
+c'est le reflet de ce qui n'avait pas besoin d'entrepôt.
+
+**Les crédits affichés sont ceux consommés, pas ceux facturés.** La
+documentation Snowflake le dit : `WAREHOUSE_METERING_HISTORY.CREDITS_USED` ne
+déduit pas la ristourne sur les services cloud et peut donc dépasser le
+montant facturé. Le chiffre exact est dans
+`SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY` (`CREDITS_BILLED`), qui
+demande un rôle ayant accès à la base `SNOWFLAKE`.
+
 La leçon à dire à voix haute : **les modèles ne se comparent pas ligne à
 ligne**. Snowflake et Databricks facturent le calcul allumé, BigQuery le
 volume analysé (avec un tébioctet gratuit par mois, donc nos lectures sont

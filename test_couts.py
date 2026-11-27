@@ -271,6 +271,40 @@ def test_le_comparatif_du_marche_est_date_et_source():
     assert "2026" in couts.RELEVE_TARIFS
 
 
+def test_chaque_ligne_du_comparatif_porte_une_estimation_en_euros():
+    marche = couts.tarifs()
+    assert all(str(e).strip() for e in marche["Estimation par mois"])
+    # Snowflake : 6,67 h × 1 crédit × 2,60 $ × 0,90 = 15,61 €. Le chiffre
+    # doit être recalculable à la main par celui qui lit le tableau.
+    snowflake = marche.loc[marche["Entrepôt"].str.startswith("Snowflake")]
+    attendu = couts.en_euros(round(couts.SCENARIO_HEURES * 2.60, 2),
+                             couts.TAUX_USD_EUR)
+    assert snowflake["Estimation par mois"].iloc[0] == f"{couts.fr(attendu)} €"
+
+
+def test_bigquery_est_annonce_gratuit_et_pas_a_zero_sec():
+    ligne = couts.tarifs()
+    bq = ligne.loc[ligne["Entrepôt"].str.startswith("Google")]
+    # « 0 € » tout seul ferait croire à une donnée manquante.
+    assert "gratuit" in bq["Estimation par mois"].iloc[0]
+    assert "tébioctet gratuit" in bq["Comment c'est calculé"].iloc[0]
+
+
+def test_le_taux_du_dollar_se_regle_et_change_les_euros():
+    cher = couts.tarifs(taux_usd_eur=2.0)
+    pas_cher = couts.tarifs(taux_usd_eur=0.5)
+    assert (cher["Estimation par mois"].iloc[0]
+            != pas_cher["Estimation par mois"].iloc[0])
+
+
+def test_le_scenario_est_ecrit_avec_l_estimation():
+    phrase = couts.phrase_scenario()
+    # Une estimation sans hypothèse n'est qu'un chiffre jeté.
+    assert str(couts.SCENARIO_OUVERTURES) in phrase
+    assert str(couts.SCENARIO_MINUTES) in phrase
+    assert "le dollar" in phrase
+
+
 # ------------------------------------------------------------------
 # L'écran, hors Snowflake : c'est le cas d'un client sur Oracle
 # ------------------------------------------------------------------

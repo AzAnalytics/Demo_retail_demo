@@ -124,6 +124,12 @@ PRIX_CREDIT = float(_get("COCKPIT_PRIX_CREDIT", "2.50"))
 # même période.
 COUTS_JOURS = int(_get("COCKPIT_COUTS_JOURS", "30"))
 
+# Le dollar en euros, pour le comparatif des entrepôts du marché, dont les
+# prix catalogue sont tous en dollars. Relevé à 1 € = 1,117 $ le 11/11/2026,
+# soit 0,90 € le dollar. Un taux bouge : c'est un réglage, pas une constante
+# enfouie dans le code.
+TAUX_USD_EUR = float(_get("COCKPIT_TAUX_USD_EUR", "0.90"))
+
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
 # télécharge les ventes d'une boutique fictive. Chez un client, on le met à 1 :

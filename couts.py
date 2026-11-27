@@ -76,6 +76,29 @@ ORDER BY 2 DESC
 # facturation, jamais à établir un devis.
 RELEVE_TARIFS = "27 novembre 2026"
 
+# Le dollar en euros. Réglage plutôt que constante cachée : un taux bouge,
+# et un chiffre en euros calculé avec un taux d'il y a six mois est faux
+# sans prévenir. Relevé à 1 € = 1,117 $ le 11/11/2026.
+TAUX_USD_EUR = 0.90
+
+# Le scénario de l'estimation, écrit noir sur blanc parce qu'une estimation
+# sans hypothèse n'est qu'un chiffre jeté : vingt consultations par mois,
+# vingt minutes d'écran ouvert chacune, une lecture par consultation (le
+# cache de l'écran tient une heure), et quelques mégaoctets analysés.
+def _virgule(nombre) -> str:
+    """2.5 -> « 2,5 ». Défini ici parce que les constantes ci-dessous s'en servent."""
+    return str(nombre).replace(".", ",")
+
+
+SCENARIO_OUVERTURES = 20
+SCENARIO_MINUTES = 20
+SCENARIO_MO = 5
+SCENARIO_HEURES = round(SCENARIO_OUVERTURES * SCENARIO_MINUTES / 60, 2)   # 6,67 h
+# Une requête facturée à la minute, vingt fois : le temps de calcul réel.
+SCENARIO_HEURES_REQUETES = round(SCENARIO_OUVERTURES * 1 / 60, 2)          # 0,33 h
+# Databricks arrête son entrepôt au bout de dix minutes d'inactivité.
+SCENARIO_HEURES_DATABRICKS = round(SCENARIO_OUVERTURES * 11 / 60, 2)       # 3,67 h
+
 TARIFS_ENTREPOTS = [
     {
         "entrepot": "Snowflake (Standard)",
@@ -84,6 +107,8 @@ TARIFS_ENTREPOTS = [
                 "un entrepôt XS brûle 1 crédit par heure allumée",
         "pour_ce_cockpit": "on ne paie que les secondes d'entrepôt allumé, "
                            "mais une page laissée ouverte le tient éveillé",
+        "estimation_usd": round(SCENARIO_HEURES * 1.0 * 2.60, 2),
+        "calcul": f"{_virgule(SCENARIO_HEURES)} h d'entrepôt allumé × 1 crédit × 2,60 $",
         "source": "snowflake.com/pricing (prix régionaux : sources secondaires)",
     },
     {
@@ -93,6 +118,10 @@ TARIFS_ENTREPOTS = [
                 "étant gratuit",
         "pour_ce_cockpit": "nos lectures pèsent quelques mégaoctets : elles "
                            "tiennent dans la part gratuite",
+        "estimation_usd": 0.0,
+        "calcul": f"{SCENARIO_OUVERTURES} × {SCENARIO_MO} Mo = "
+                  f"{SCENARIO_OUVERTURES * SCENARIO_MO} Mo, "
+                  "très en dessous du tébioctet gratuit",
         "source": "cloud.google.com/bigquery/pricing",
     },
     {
@@ -103,6 +132,8 @@ TARIFS_ENTREPOTS = [
                 "publié dans nos sources",
         "pour_ce_cockpit": "une minute facturée par lecture, le reste du "
                            "temps rien",
+        "estimation_usd": round(SCENARIO_HEURES_REQUETES * 4 * 0.375, 2),
+        "calcul": f"{_virgule(SCENARIO_HEURES_REQUETES)} h de requêtes × 4 RPU × 0,375 $",
         "source": "aws.amazon.com/redshift/pricing",
     },
     {
@@ -112,6 +143,9 @@ TARIFS_ENTREPOTS = [
                 "heure, soit environ 2,80 $ l'heure",
         "pour_ce_cockpit": "le plus cher à l'heure allumée, mais il s'arrête "
                            "tout seul comme Snowflake",
+        "estimation_usd": round(SCENARIO_HEURES_DATABRICKS * 4 * 0.70, 2),
+        "calcul": f"{_virgule(SCENARIO_HEURES_DATABRICKS)} h (1 min de requête puis "
+                  "10 min avant l'arrêt automatique) × 4 DBU × 0,70 $",
         "source": "databricks.com/product/pricing",
     },
     {
@@ -121,20 +155,47 @@ TARIFS_ENTREPOTS = [
                 "l'heure pour un F2 ; environ 22 % de plus en Europe de l'Ouest",
         "pour_ce_cockpit": "la capacité se paie même quand personne ne "
                            "regarde, sauf à la mettre en pause",
+        "estimation_usd": round(SCENARIO_HEURES * 0.36, 2),
+        "calcul": f"{_virgule(SCENARIO_HEURES)} h × 0,36 $, **à condition de mettre la "
+                  "capacité en pause** le reste du temps ; laissée allumée, "
+                  "c'est 730 h × 0,36 $, soit environ 263 $ par mois",
         "source": "azure.microsoft.com/pricing/details/microsoft-fabric",
     },
 ]
 
 
-def tarifs() -> pd.DataFrame:
-    """Le comparatif, prêt à afficher, avec ses colonnes en français."""
-    return pd.DataFrame(TARIFS_ENTREPOTS).rename(columns={
-        "entrepot": "Entrepôt",
-        "facturation": "Ce qui est facturé",
-        "prix": "Prix public",
-        "pour_ce_cockpit": "Pour un écran comme celui-ci",
-        "source": "Source",
-    })
+def phrase_scenario() -> str:
+    """Les hypothèses de l'estimation, en une phrase, à afficher avec elle."""
+    return (f"Scénario : {SCENARIO_OUVERTURES} consultations par mois, "
+            f"{SCENARIO_MINUTES} minutes d'écran ouvert chacune "
+            f"(soit {fr(SCENARIO_HEURES)} h), une lecture d'environ "
+            f"{SCENARIO_MO} Mo par consultation. Conversion à "
+            f"{fr(TAUX_USD_EUR)} € le dollar.")
+
+
+def tarifs(taux_usd_eur: float = TAUX_USD_EUR) -> pd.DataFrame:
+    """Le comparatif, prêt à afficher, estimation en euros comprise.
+
+    L'estimation vient du scénario décrit plus haut et du prix de la même
+    ligne : chaque chiffre est donc recalculable à la main par celui qui
+    lit le tableau, et c'est la seule façon qu'il ait de le contester.
+    """
+    lignes = []
+    for tarif in TARIFS_ENTREPOTS:
+        euros = en_euros(tarif.get("estimation_usd", 0), taux_usd_eur)
+        lignes.append({
+            "Entrepôt": tarif["entrepot"],
+            "Ce qui est facturé": tarif["facturation"],
+            "Prix public": tarif["prix"],
+            "Estimation par mois": (f"{fr(euros)} €" if euros
+                                    else "0 € (gratuit à ce volume)"),
+            "Comment c'est calculé": (
+                f"{tarif.get('calcul', '')}. "
+                + tarif["pour_ce_cockpit"][:1].upper()
+                + tarif["pour_ce_cockpit"][1:] + "."),
+            "Source": tarif["source"],
+        })
+    return pd.DataFrame(lignes)
 
 
 def par_entrepot(jours: int = 30, session=None, base: str = "",

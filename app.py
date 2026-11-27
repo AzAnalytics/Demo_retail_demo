@@ -853,6 +853,28 @@ if autorise_a("diagnostic"):
                                                       "credits": "Crédits",
                                                       "euros": "Euros estimés"}),
                             hide_index=True, use_container_width=True)
+                        # Deux précisions que personne ne devine, et qui
+                        # évitent de raconter une bêtise devant un client.
+                        if "CLOUD_SERVICES_ONLY" in set(detail_wh["entrepot"]):
+                            st.caption(
+                                "`CLOUD_SERVICES_ONLY` n'est pas un entrepôt : "
+                                "c'est la ligne où Snowflake range le travail "
+                                "qui ne tourne sur aucun entrepôt (compilation "
+                                "des requêtes, commandes SHOW, lecture des "
+                                "métadonnées, réponses servies par le cache de "
+                                "résultats). Elle coûte presque rien parce que "
+                                "Snowflake ne facture les services cloud "
+                                "qu'au-delà de 10 % du calcul consommé dans la "
+                                "journée : en dessous, c'est offert."
+                            )
+                        st.caption(
+                            "Ces crédits sont ceux **consommés** : la vue de "
+                            "facturation par entrepôt ne déduit pas la "
+                            "ristourne de 10 % sur les services cloud, donc "
+                            "le montant réellement facturé est un peu plus "
+                            "bas. Le chiffre exact est dans "
+                            "SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY."
+                        )
             st.caption(
                 "Le vrai poste de coût n'est pas la requête mais l'onglet : "
                 "tant que le Cockpit reste ouvert, l'entrepôt reste allumé, "
@@ -896,8 +918,12 @@ if autorise_a("diagnostic"):
         if autorise_a("administrer") and hasattr(couts, "tarifs"):
             if st.toggle("Comparer avec les autres entrepôts du marché",
                          value=False, key="_comparatif_entrepots"):
-                st.dataframe(couts.tarifs(), hide_index=True,
-                             use_container_width=True)
+                st.dataframe(
+                    couts.tarifs(reglage("TAUX_USD_EUR",
+                                         getattr(couts, "TAUX_USD_EUR", 0.9))),
+                    hide_index=True, use_container_width=True)
+                if hasattr(couts, "phrase_scenario"):
+                    st.caption(couts.phrase_scenario())
                 st.caption(
                     f"Prix publics relevés le {couts.RELEVE_TARIFS}, hors "
                     "stockage, hors transfert et hors remise contractuelle. "
