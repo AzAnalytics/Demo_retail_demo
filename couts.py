@@ -56,6 +56,112 @@ WHERE WAREHOUSE_NAME = {entrepot}
 """
 
 
+REQUETE_PAR_ENTREPOT = """
+SELECT WAREHOUSE_NAME    AS "entrepot",
+       SUM(CREDITS_USED) AS "credits"
+FROM TABLE({prefixe}WAREHOUSE_METERING_HISTORY(
+         DATE_RANGE_START => DATEADD(day, -{jours}, CURRENT_DATE())))
+GROUP BY 1
+HAVING SUM(CREDITS_USED) > 0
+ORDER BY 2 DESC
+"""
+
+# ------------------------------------------------------------------
+# Les prix publics des entrepôts du marché
+# ------------------------------------------------------------------
+# Relevés à la main sur les pages officielles, avec leur date : un prix de
+# cloud bouge, et un tableau non daté finit par faire mentir celui qui le
+# montre. Les montants sont des prix catalogue, hors stockage, hors
+# remises contractuelles : ils servent à expliquer un modèle de
+# facturation, jamais à établir un devis.
+RELEVE_TARIFS = "27 novembre 2026"
+
+TARIFS_ENTREPOTS = [
+    {
+        "entrepot": "Snowflake (Standard)",
+        "facturation": "au crédit, à la seconde, minimum 1 minute par réveil",
+        "prix": "environ 2,60 $ le crédit en Europe (2,00 $ aux États-Unis) ; "
+                "un entrepôt XS brûle 1 crédit par heure allumée",
+        "pour_ce_cockpit": "on ne paie que les secondes d'entrepôt allumé, "
+                           "mais une page laissée ouverte le tient éveillé",
+        "source": "snowflake.com/pricing (prix régionaux : sources secondaires)",
+    },
+    {
+        "entrepot": "Google BigQuery (à la demande)",
+        "facturation": "au volume analysé par les requêtes",
+        "prix": "6,25 $ le tébioctet analysé, le premier tébioctet du mois "
+                "étant gratuit",
+        "pour_ce_cockpit": "nos lectures pèsent quelques mégaoctets : elles "
+                           "tiennent dans la part gratuite",
+        "source": "cloud.google.com/bigquery/pricing",
+    },
+    {
+        "entrepot": "Amazon Redshift Serverless",
+        "facturation": "à l'heure de calcul (RPU), minimum 4 RPU et 60 s",
+        "prix": "environ 0,375 $ par RPU-heure aux États-Unis, soit à partir "
+                "d'environ 1,50 $ l'heure de requêtes ; tarif européen non "
+                "publié dans nos sources",
+        "pour_ce_cockpit": "une minute facturée par lecture, le reste du "
+                           "temps rien",
+        "source": "aws.amazon.com/redshift/pricing",
+    },
+    {
+        "entrepot": "Databricks SQL Serverless",
+        "facturation": "à l'unité de calcul (DBU), arrêt automatique",
+        "prix": "0,70 $ le DBU ; un entrepôt 2X-Small consomme 4 DBU par "
+                "heure, soit environ 2,80 $ l'heure",
+        "pour_ce_cockpit": "le plus cher à l'heure allumée, mais il s'arrête "
+                           "tout seul comme Snowflake",
+        "source": "databricks.com/product/pricing",
+    },
+    {
+        "entrepot": "Microsoft Fabric (F2, paiement à l'usage)",
+        "facturation": "à la capacité réservée, à la seconde, en pause possible",
+        "prix": "0,18 $ par CU-heure aux États-Unis, soit environ 0,36 $ "
+                "l'heure pour un F2 ; environ 22 % de plus en Europe de l'Ouest",
+        "pour_ce_cockpit": "la capacité se paie même quand personne ne "
+                           "regarde, sauf à la mettre en pause",
+        "source": "azure.microsoft.com/pricing/details/microsoft-fabric",
+    },
+]
+
+
+def tarifs() -> pd.DataFrame:
+    """Le comparatif, prêt à afficher, avec ses colonnes en français."""
+    return pd.DataFrame(TARIFS_ENTREPOTS).rename(columns={
+        "entrepot": "Entrepôt",
+        "facturation": "Ce qui est facturé",
+        "prix": "Prix public",
+        "pour_ce_cockpit": "Pour un écran comme celui-ci",
+        "source": "Source",
+    })
+
+
+def par_entrepot(jours: int = 30, session=None, base: str = "",
+                 prix_credit: float = 0.0) -> pd.DataFrame:
+    """Les crédits consommés par chaque entrepôt du compte, sur la période.
+
+    Un tableau vide si la facturation n'est pas lisible depuis ce rôle :
+    comme partout ici, un refus de droits ne casse rien.
+    """
+    session = session or session_snowflake()
+    if session is None:
+        return pd.DataFrame()
+    requete = REQUETE_PAR_ENTREPOT.format(prefixe=prefixe_schema(base),
+                                          jours=max(1, int(jours)))
+    try:
+        lignes = session.sql(requete).to_pandas()
+    except Exception:
+        return pd.DataFrame()
+    if lignes.empty:
+        return lignes
+    lignes["credits"] = lignes["credits"].map(lambda v: round(_nombre(v), 3))
+    if prix_credit:
+        lignes["euros"] = lignes["credits"].map(
+            lambda c: en_euros(c, prix_credit))
+    return lignes
+
+
 def base_de(objet: str) -> str:
     """La base d'un nom qualifié.
 

@@ -216,3 +216,25 @@ demande à votre base » : lectures, durée totale, lecture la plus lente, ligne
 ramenées. Chez un client sur Oracle il n'y a pas de crédit à afficher, mais la
 question de son informaticien est la même. Détail dans `BASES-DE-DONNEES.md`,
 section 5.
+
+### Les deux comparatifs
+
+Sous les indicateurs, le panneau donne aussi :
+
+- **les crédits entrepôt par entrepôt** sur la période (`WH_XS`, `COMPUTE_WH`,
+  et tous les autres du compte). C'est là qu'on repère l'entrepôt oublié
+  allumé, qui coûte souvent plus que celui qui travaille ;
+- **le comparatif du marché**, derrière un interrupteur : Snowflake, BigQuery,
+  Redshift Serverless, Databricks SQL et Microsoft Fabric, avec leur modèle de
+  facturation, leur prix public et ce que cela change pour un écran comme
+  celui-ci. Les prix sont relevés à la main, datés (`couts.RELEVE_TARIFS`) et
+  accompagnés de leur source : un prix de cloud bouge, et un tableau non daté
+  finit par faire mentir celui qui le montre. À remettre à jour dans
+  `couts.TARIFS_ENTREPOTS`.
+
+La leçon à dire à voix haute : **les modèles ne se comparent pas ligne à
+ligne**. Snowflake et Databricks facturent le calcul allumé, BigQuery le
+volume analysé (avec un tébioctet gratuit par mois, donc nos lectures sont
+gratuites), Fabric une capacité réservée qui se paie même à vide. Pour un
+écran qui lit quelques mégaoctets une fois par heure, c'est le modèle qui
+décide de la facture, pas le prix unitaire.

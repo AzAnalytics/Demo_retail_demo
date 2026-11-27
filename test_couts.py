@@ -228,6 +228,50 @@ def test_sans_lecture_la_phrase_le_dit_au_lieu_d_afficher_zero():
 
 
 # ------------------------------------------------------------------
+# Le comparatif : les entrepôts du compte, puis ceux du marché
+# ------------------------------------------------------------------
+def test_les_credits_sont_donnes_entrepot_par_entrepot():
+    session = FausseSession(credits=[{"entrepot": "WH_XS", "credits": 5.692},
+                                     {"entrepot": "COMPUTE_WH", "credits": 1.2}])
+    tableau = couts.par_entrepot(30, session=session, prix_credit=2.5)
+    assert list(tableau["entrepot"]) == ["WH_XS", "COMPUTE_WH"]
+    assert tableau["credits"].iloc[0] == 5.692
+    # La conversion suit, au prix indiqué, et seulement s'il est renseigné.
+    assert tableau["euros"].iloc[0] == 14.23
+
+
+def test_sans_prix_du_credit_on_n_invente_pas_d_euros():
+    session = FausseSession(credits=[{"entrepot": "WH_XS", "credits": 1.0}])
+    tableau = couts.par_entrepot(30, session=session)
+    assert "euros" not in tableau.columns
+
+
+def test_la_requete_par_entrepot_ne_filtre_sur_aucun_entrepot():
+    # Tout l'intérêt : voir aussi celui qu'on a oublié allumé.
+    session = FausseSession(credits=[{"entrepot": "WH_XS", "credits": 1.0}])
+    couts.par_entrepot(30, session=session)
+    requete = [r for r in session.requetes if "METERING" in r][0]
+    assert "WAREHOUSE_NAME =>" not in requete
+    assert "GROUP BY 1" in requete
+
+
+def test_un_refus_de_droits_rend_un_tableau_vide_pas_une_exception():
+    tableau = couts.par_entrepot(30, session=FausseSession(casse_facturation=True))
+    assert tableau.empty
+
+
+def test_le_comparatif_du_marche_est_date_et_source():
+    marche = couts.tarifs()
+    assert len(marche) >= 5
+    assert "Snowflake (Standard)" in list(marche["Entrepôt"])
+    assert "Google BigQuery (à la demande)" in list(marche["Entrepôt"])
+    # Aucun prix sans sa source : c'est ce qui distingue un comparatif
+    # d'une affirmation.
+    assert all(str(s).strip() for s in marche["Source"])
+    assert "2026" in couts.RELEVE_TARIFS
+
+
+# ------------------------------------------------------------------
 # L'écran, hors Snowflake : c'est le cas d'un client sur Oracle
 # ------------------------------------------------------------------
 def test_l_ecran_montre_la_charge_quand_il_n_y_a_pas_d_entrepot():
@@ -262,6 +306,26 @@ def test_l_ecran_montre_la_charge_quand_il_n_y_a_pas_d_entrepot():
         lectures = [m for m in app.get("metric")
                     if m.label == "Lectures depuis l'ouverture"]
         assert lectures and str(lectures[0].value) == "1"
+    finally:
+        st.cache_data.clear()
+
+
+def test_le_comparatif_s_ouvre_depuis_l_ecran_et_reste_source():
+    """Replié par défaut : c'est une référence, pas une mesure."""
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+
+    st.cache_data.clear()
+    try:
+        app = AppTest.from_file("app.py", default_timeout=180)
+        app.run()
+        bascules = [t for t in app.toggle if "autres entrepôts" in t.label]
+        assert bascules, [t.label for t in app.toggle]
+        # Fermé au départ : le tableau n'encombre pas le panneau.
+        assert not any("Prix publics relevés" in c.value for c in app.caption)
+        app = bascules[0].set_value(True).run()
+        assert not app.exception, [str(e) for e in app.exception]
+        assert any("Prix publics relevés" in c.value for c in app.caption)
     finally:
         st.cache_data.clear()
 

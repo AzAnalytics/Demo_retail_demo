@@ -840,6 +840,19 @@ if autorise_a("diagnostic"):
                         "(Snowflake ne garde pas le détail au-delà)"
                     )
                 st.caption(" · ".join(detail) + ".")
+                # Le détail par entrepôt : c'est là qu'on voit qu'un
+                # entrepôt oublié allumé coûte plus que celui qui travaille.
+                if hasattr(couts, "par_entrepot"):
+                    detail_wh = couts.par_entrepot(jours_couts,
+                                                   base=couts.base_de(table_sf or ""),
+                                                   prix_credit=prix_credit)
+                    if not detail_wh.empty:
+                        st.caption(f"Par entrepôt, sur {jours_couts} jours :")
+                        st.dataframe(
+                            detail_wh.rename(columns={"entrepot": "Entrepôt",
+                                                      "credits": "Crédits",
+                                                      "euros": "Euros estimés"}),
+                            hide_index=True, use_container_width=True)
             st.caption(
                 "Le vrai poste de coût n'est pas la requête mais l'onglet : "
                 "tant que le Cockpit reste ouvert, l'entrepôt reste allumé, "
@@ -874,6 +887,28 @@ if autorise_a("diagnostic"):
                 "les filtres ne déclenchent aucune lecture : ils travaillent "
                 "sur ce qui est déjà en mémoire."
             )
+
+        # Le comparatif du marché. La question arrive toujours une fois le
+        # premier chiffre affiché : « et si j'étais chez un autre ? » Replié
+        # derrière un interrupteur, parce que c'est une référence et pas une
+        # mesure, et qu'un panneau technique surchargé ne se lit plus.
+        # (Pas un expander : Streamlit refuse de les imbriquer.)
+        if autorise_a("administrer") and hasattr(couts, "tarifs"):
+            if st.toggle("Comparer avec les autres entrepôts du marché",
+                         value=False, key="_comparatif_entrepots"):
+                st.dataframe(couts.tarifs(), hide_index=True,
+                             use_container_width=True)
+                st.caption(
+                    f"Prix publics relevés le {couts.RELEVE_TARIFS}, hors "
+                    "stockage, hors transfert et hors remise contractuelle. "
+                    "Les modèles ne se comparent pas ligne à ligne : "
+                    "Snowflake et Databricks facturent le temps de calcul "
+                    "allumé, BigQuery le volume analysé, Fabric une capacité "
+                    "réservée. Pour un écran qui lit quelques mégaoctets une "
+                    "fois par heure, c'est le modèle qui décide de la "
+                    "facture, pas le prix unitaire. Un prix de cloud bouge : "
+                    "à revérifier chez l'éditeur avant d'en faire un devis."
+                )
 
 # ------------------------------------------------------------------
 # Gérer les personnes depuis l'écran
