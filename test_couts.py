@@ -256,6 +256,12 @@ def test_l_ecran_montre_la_charge_quand_il_n_y_a_pas_d_entrepot():
         labels = " ".join(m.label for m in app.get("metric"))
         assert "Crédits sur" not in labels
         assert "Lectures depuis l'ouverture" in labels
+        # Et le compteur compte vraiment : le cache de Streamlit rend une
+        # copie du tableau qui perd ses `attrs`, et l'écran affichait
+        # « 0 lecture » sur une page qui venait d'en faire une.
+        lectures = [m for m in app.get("metric")
+                    if m.label == "Lectures depuis l'ouverture"]
+        assert lectures and str(lectures[0].value) == "1"
     finally:
         st.cache_data.clear()
 

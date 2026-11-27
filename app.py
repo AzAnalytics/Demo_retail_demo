@@ -161,15 +161,21 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
                     magasins: tuple = (), mois: int = 0):
     """Lit le fichier de caisse, le contrôle, et ramène les montants hors taxes.
 
-    Renvoie (données, problème). `problème` est une phrase en français destinée
-    au visiteur : si le fichier change ou disparaît, il voit un message, jamais
-    une erreur Python.
+    Renvoie (données, problème, mesure). `problème` est une phrase en français
+    destinée au visiteur : si le fichier change ou disparaît, il voit un
+    message, jamais une erreur Python.
+
+    `mesure` dit ce qu'a coûté la lecture : durée, heure, lignes, requête. Un
+    dictionnaire ordinaire et pas les `attrs` du tableau, parce que le cache
+    de Streamlit rend une copie qui les perd en chemin ; l'écran affichait
+    alors « 0 lecture » sur une page qui venait pourtant d'en faire une.
 
     Convention de prix : le fichier contient des prix boutique, donc TTC. Tout
     ce qui est affiché est hors taxes (`config.TAUX_TVA`). Le coût d'achat est
     déjà hors taxes, parce que le commerçant récupère la TVA sur ses achats.
     """
     chemin = Path(chemin)
+    depart = time.perf_counter()
     # Dans Snowflake, on lit l'entrepôt : c'est là que vivent les données du
     # client, et elles n'en sortent pas. Si la table est vide ou absente, on
     # se rabat sur le fichier plutôt que d'afficher un écran vide.
@@ -183,7 +189,7 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
             brut["mois"] = brut["date"].dt.to_period("M").dt.to_timestamp()
             brut["jour_sem"] = brut["date"].dt.day_of_week
             brut.attrs.update(attrs)
-            return brut, ""
+            return brut, "", attrs
         except Exception as erreur:        # table vide, absente, droits manquants
             st.session_state["_repli_fichier"] = str(erreur)
 
@@ -200,42 +206,48 @@ def charger_donnees(chemin: str, taux_tva: float, demo_auto: bool,
         else:
             df = pd.read_csv(chemin, parse_dates=["date"])
     except FileNotFoundError:
-        return None, f"Le fichier de ventes est introuvable ({chemin.name})."
+        return None, f"Le fichier de ventes est introuvable ({chemin.name}).", {}
     except Exception as erreur:                      # fichier illisible, encodage, etc.
-        return None, f"Le fichier de ventes n'a pas pu être lu ({chemin.name}) : {erreur}"
+        return (None,
+                f"Le fichier de ventes n'a pas pu être lu ({chemin.name}) : {erreur}",
+                {})
 
     manquantes = [c for c in COLONNES_ATTENDUES if c not in df.columns]
     if manquantes:
         return None, ("Le fichier de ventes n'a pas la forme attendue. "
-                      f"Colonne(s) absente(s) : {', '.join(manquantes)}.")
+                      f"Colonne(s) absente(s) : {', '.join(manquantes)}."), {}
     if df.empty:
-        return None, "Le fichier de ventes ne contient aucune ligne."
+        return None, "Le fichier de ventes ne contient aucune ligne.", {}
 
     df = df.dropna(subset=["date"]).copy()
     if df.empty:
-        return None, "Aucune date exploitable dans le fichier de ventes."
+        return None, "Aucune date exploitable dans le fichier de ventes.", {}
 
     for colonne in ("quantite", "prix_unitaire", "cout_unitaire", "ca_ttc"):
         df[colonne] = pd.to_numeric(df[colonne], errors="coerce")
     df = df.dropna(subset=["quantite", "ca_ttc"])
     if df.empty:
-        return None, "Aucun montant exploitable dans le fichier de ventes."
+        return None, "Aucun montant exploitable dans le fichier de ventes.", {}
 
     # TTC -> HT, puis marge hors taxes : prix de vente HT moins coût d'achat.
     df = cal.montants_hors_taxes(df, taux_tva)
     df["mois"] = df["date"].dt.to_period("M").dt.to_timestamp()
     df["jour_sem"] = df["date"].dt.day_of_week
-    return df, ""
+    mesure = {"duree_ms": round((time.perf_counter() - depart) * 1000),
+              "lu_a": time.time(), "lignes": int(len(df)),
+              "origine": chemin.name}
+    return df, "", mesure
 
 
 # Les réglages passent en argument : le cache se renouvelle quand ils changent.
 FRAICHEUR = int(reglage("FRAICHEUR_S", 0))
 
-df, probleme = charger_donnees(str(config.DATA_FILE),
-                               reglage("TAUX_TVA", 0.20),
-                               reglage("DEMO_AUTO", True),
-                               tuple(sorted(profil.magasins)) if profil else (),
-                               reglage("MOIS_HISTORIQUE", 0))
+df, probleme, mesure = charger_donnees(
+    str(config.DATA_FILE),
+    reglage("TAUX_TVA", 0.20),
+    reglage("DEMO_AUTO", True),
+    tuple(sorted(profil.magasins)) if profil else (),
+    reglage("MOIS_HISTORIQUE", 0))
 if probleme:
     st.error(probleme, icon="🚫")
     st.caption("Le Cockpit préfère ne rien afficher plutôt que d'afficher un chiffre faux.")
@@ -256,7 +268,7 @@ CLEF_LECTURES = getattr(couts, "CLEF_REGISTRE", "_cockpit_lectures")
 _suit = getattr(couts, "suit", None)
 if _suit is not None:
     st.session_state[CLEF_LECTURES] = _suit(
-        st.session_state.get(CLEF_LECTURES), df.attrs)
+        st.session_state.get(CLEF_LECTURES), mesure)
 
 # Le périmètre de la personne connectée, appliqué AVANT tout calcul : un
 # graphique caché n'est pas une protection, et la prévision travaillerait
@@ -704,18 +716,18 @@ if autorise_a("diagnostic"):
                 f"**Période** : du {df['date'].min():%d/%m/%Y} "
                 f"au {df['date'].max():%d/%m/%Y}",
                 ("**Lecture de l'entrepôt** : "
-                 f"{df.attrs['duree_ms']} ms" if df.attrs.get("duree_ms")
+                 f"{mesure['duree_ms']} ms" if mesure.get("duree_ms")
                  else "**Relecture** : au plus une fois par heure (cache)"),
                 f"**Profils chargés** : {len(PROFILS) if PROFILS else 'aucun'}",
             ])
         )
         # Les versions et les types : ce sont eux qui expliquent une figure
         # qui ne rend pas pareil d'un hébergement à l'autre.
-        if df.attrs.get("lu_a"):
+        if mesure.get("lu_a"):
             # L'ancienneté plutôt que l'heure : l'horloge du serveur Snowflake
             # n'est pas celle du client, et une heure fausse à l'écran coûte
             # plus cher en confiance qu'elle ne rapporte en précision.
-            age = max(0, int(time.time() - df.attrs["lu_a"]))
+            age = max(0, int(time.time() - mesure["lu_a"]))
             quand = f"il y a {age} s" if age < 90 else f"il y a {age // 60} min"
             suite = (f"relecture automatique toutes les {FRAICHEUR // 60} minutes"
                      if FRAICHEUR >= 60 else
@@ -760,10 +772,10 @@ if autorise_a("diagnostic"):
                     st.caption(f"Aucune anomalie — {detail}")
         # La requête, telle qu'elle part dans l'entrepôt. Un informaticien
         # veut la lire avant d'ouvrir un accès : autant la montrer.
-        if df.attrs.get("requete"):
+        if mesure.get("requete"):
             st.markdown("**La requête exécutée dans l'entrepôt**")
-            st.code(df.attrs["requete"], language="sql")
-            if "MAGASIN IN" in df.attrs["requete"]:
+            st.code(mesure["requete"], language="sql")
+            if "MAGASIN IN" in mesure["requete"]:
                 st.caption("Le périmètre du compte est dans la requête : "
                            "les lignes des autres magasins ne sortent jamais "
                            "de l'entrepôt.")
@@ -1027,11 +1039,11 @@ if autorise_a("administrer") and PROFILS:
 # se réveille tout seul, regarde l'âge de la lecture, et relance l'écran quand
 # elle a dépassé le délai. Entre deux réveils il ne redessine que lui-même :
 # la page ne clignote pas pendant une démonstration.
-if FRAICHEUR and df.attrs.get("lu_a"):
+if FRAICHEUR and mesure.get("lu_a"):
 
     @st.fragment(run_every=30)
     def actualisation_automatique():
-        if time.time() - df.attrs["lu_a"] > FRAICHEUR:
+        if time.time() - mesure["lu_a"] > FRAICHEUR:
             st.cache_data.clear()
             st.rerun(scope="app")
 
