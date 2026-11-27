@@ -58,11 +58,12 @@ ALTER WAREHOUSE WH_XS SET RESOURCE_MONITOR = MONITEUR_COCKPIT;
 -- STATEMENT_TIMEOUT_IN_SECONDS = 300 : une requête qui dépasse cinq
 -- minutes sur cette base est une erreur, pas un travail long. Mieux vaut
 -- qu'elle s'arrête que de la découvrir sur la facture du mois.
+-- (INITIALLY_SUSPENDED n'existe qu'à la création d'un entrepôt : dans un
+-- ALTER, Snowflake refuse le paramètre.)
 ALTER WAREHOUSE WH_XS SET
     WAREHOUSE_SIZE = XSMALL
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
-    INITIALLY_SUSPENDED = TRUE
     STATEMENT_TIMEOUT_IN_SECONDS = 300;
 
 -- -----------------------------------------------------------------
