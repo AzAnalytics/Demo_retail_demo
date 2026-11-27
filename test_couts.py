@@ -258,3 +258,28 @@ def test_l_ecran_montre_la_charge_quand_il_n_y_a_pas_d_entrepot():
         assert "Lectures depuis l'ouverture" in labels
     finally:
         st.cache_data.clear()
+
+
+def test_une_mise_a_jour_a_moitie_rechargee_ne_casse_pas_l_ecran(monkeypatch):
+    """Arrivé en vrai le 27/11/2026 sur la copie publique.
+
+    L'hébergeur recharge `app.py` mais garde en mémoire le `couts.py` de la
+    version précédente : la fonction toute neuve est introuvable pendant
+    quelques secondes. Un compteur d'usage n'a pas le droit de faire tomber
+    le tableau de bord de quelqu'un pour si peu.
+    """
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.delattr(couts, "suit")
+    monkeypatch.delattr(couts, "phrase_charge")
+    st.cache_data.clear()
+    try:
+        app = AppTest.from_file("app.py", default_timeout=180)
+        app.run()
+        assert not app.exception, [str(e) for e in app.exception]
+        # L'écran tourne, simplement sans le bloc de charge.
+        labels = " ".join(m.label for m in app.get("metric"))
+        assert "Lectures depuis l'ouverture" not in labels
+    finally:
+        st.cache_data.clear()

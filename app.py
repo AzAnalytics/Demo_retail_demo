@@ -245,8 +245,18 @@ if probleme:
 # seulement quand quelqu'un ouvre le panneau technique. Chez un client sur
 # Oracle il n'y a pas de crédit à afficher, mais son informaticien pose la
 # même question : qu'est-ce que cet écran demande à ma base ?
-st.session_state[couts.CLEF_REGISTRE] = couts.suit(
-    st.session_state.get(couts.CLEF_REGISTRE), df.attrs)
+#
+# `getattr` et pas un appel direct, pour la même raison que `reglage` plus
+# haut : au moment d'une mise à jour, l'hébergeur recharge `app.py` sans
+# forcément réimporter les modules voisins déjà en mémoire. Une fonction
+# toute neuve est alors introuvable pendant quelques secondes, et un
+# compteur d'usage n'a pas le droit de faire tomber un tableau de bord.
+# (Vu en vrai le 27/11/2026 sur la copie publique.)
+CLEF_LECTURES = getattr(couts, "CLEF_REGISTRE", "_cockpit_lectures")
+_suit = getattr(couts, "suit", None)
+if _suit is not None:
+    st.session_state[CLEF_LECTURES] = _suit(
+        st.session_state.get(CLEF_LECTURES), df.attrs)
 
 # Le périmètre de la personne connectée, appliqué AVANT tout calcul : un
 # graphique caché n'est pas une protection, et la prévision travaillerait
@@ -823,12 +833,12 @@ if autorise_a("diagnostic"):
                 "Snowflake suspend l'entrepôt au lieu de facturer."
             )
 
-        elif autorise_a("administrer"):
+        elif autorise_a("administrer") and hasattr(couts, "phrase_charge"):
             # Sur une base que le client possède déjà (Oracle, SQL Server,
             # Postgres) ou sur un simple fichier, il n'y a pas d'euro à
             # afficher : le serveur est payé, l'écran ne coûte rien de plus.
             # On montre donc la charge, qui est la vraie question posée.
-            registre = st.session_state.get(couts.CLEF_REGISTRE) or {}
+            registre = st.session_state.get(CLEF_LECTURES) or {}
             st.markdown("**Ce que le Cockpit demande à votre base**")
             col_l, col_d, col_p = st.columns(3)
             col_l.metric("Lectures depuis l'ouverture",
