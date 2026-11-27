@@ -217,6 +217,26 @@ plutôt que de rapatrier les lignes, ou mettre en place une extraction nocturne
 dans un fichier que le Cockpit lit. La deuxième est souvent la plus simple à
 faire accepter : elle ne touche pas à la production aux heures ouvrées.
 
+### Le montrer, plutôt que de le promettre
+
+Le panneau `🔧 État technique` affiche, pour un profil administrateur, un bloc
+**« Ce que le Cockpit demande à votre base »** : nombre de lectures depuis
+l'ouverture de l'écran, temps total demandé, lecture la plus lente, lignes
+ramenées, et la requête telle qu'elle part. Tout est mesuré par l'application
+elle-même (`couts.py`, alimenté par `source_donnees._marque`) : **aucun
+privilège n'est demandé à la base du client**, pas de `V$SESSION`, pas de vue
+d'administration à ouvrir.
+
+C'est la réponse à la question que pose l'informaticien avant d'accorder un
+accès. Sur Snowflake, le même bloc affiche des crédits et des euros, parce que
+l'entrepôt facture à l'usage. Sur Oracle, SQL Server ou Postgres, il n'affiche
+aucun euro et il le dit : le serveur est déjà payé, le Cockpit ne coûte rien de
+plus. Afficher « 0 € » serait un mensonge poli, afficher la charge est une
+preuve.
+
+> « Vous voulez savoir ce que ça prend à votre base ? C'est écrit dans l'écran :
+> une lecture par heure, trois dixièmes de seconde, et voilà la requête. »
+
 ## 6. Ce qu'il faut demander à l'informaticien du client
 
 À envoyer tel quel, ça fait sérieux et ça évite trois allers-retours :

@@ -47,6 +47,36 @@ def test_une_requete_sql_donne_le_meme_tableau_qu_un_csv(tmp_path):
     assert ventes["date"].iloc[0] == pd.Timestamp("2026-10-05")
 
 
+def test_une_lecture_de_base_est_chronometree_et_datee(tmp_path):
+    """Pas seulement Snowflake : toute source dit ce qu'elle a coûté.
+
+    Chez un client sur Oracle il n'y a pas de crédit à montrer, mais son
+    informaticien demande la même chose : la requête, sa durée, et le
+    nombre de lignes sorties de sa base.
+    """
+    chemin = _base(tmp_path)
+    cx = src.connexion_sqlite(chemin)
+    try:
+        ventes = src.depuis_base(cx, "SELECT * FROM ventes", origine="la base de test")
+    finally:
+        cx.close()
+
+    assert ventes.attrs["duree_ms"] >= 0
+    assert ventes.attrs["lu_a"] > 0
+    assert ventes.attrs["lignes"] == 2
+    assert "SELECT * FROM ventes" in ventes.attrs["requete"]
+    assert ventes.attrs["origine"] == "la base de test"
+
+
+def test_une_lecture_de_fichier_est_chronometree_aussi():
+    ventes = src.depuis_csv("ventes_maison_lauret.csv")
+    assert ventes.attrs["lignes"] == len(ventes)
+    assert ventes.attrs["lu_a"] > 0
+    # Un fichier n'a pas de requête : on n'invente pas une ligne de SQL.
+    assert "requete" not in ventes.attrs
+    assert ventes.attrs["origine"] == "ventes_maison_lauret.csv"
+
+
 def test_les_colonnes_se_renomment_dans_la_requete(tmp_path):
     """Chez un client, les colonnes s'appellent autrement : c'est le SQL qui traduit."""
     chemin = tmp_path / "erp.db"

@@ -210,3 +210,9 @@ Trois précisions qui évitent de dire une bêtise devant un client :
 Le module `couts.py` ne lève jamais d'exception : sans droit `MONITOR`, sans
 entrepôt ou hors de Snowflake, il renvoie une phrase et le tableau de bord
 continue de fonctionner.
+
+**Hors Snowflake, le bloc change de visage** et devient « Ce que le Cockpit
+demande à votre base » : lectures, durée totale, lecture la plus lente, lignes
+ramenées. Chez un client sur Oracle il n'y a pas de crédit à afficher, mais la
+question de son informaticien est la même. Détail dans `BASES-DE-DONNEES.md`,
+section 5.

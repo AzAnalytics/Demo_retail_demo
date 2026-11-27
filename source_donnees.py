@@ -69,18 +69,41 @@ def valide(df: pd.DataFrame, origine: str = "la source") -> pd.DataFrame:
     return sortie.dropna(subset=["quantite", "ca_ttc"]).reset_index(drop=True)
 
 
+def _marque(ventes: pd.DataFrame, depart: float, requete: str = "",
+            origine: str = "") -> pd.DataFrame:
+    """Pose sur le tableau ce qu'a coûté sa lecture : durée, heure, volume.
+
+    **Toutes** les sources le font, pas seulement Snowflake. C'est ce qui
+    permet de répondre à l'informaticien d'un client sur Oracle, où il n'y
+    a aucun crédit à afficher mais où la question est la même : « qu'est-ce
+    que votre tableau de bord demande à ma base ? »
+    """
+    ventes.attrs["duree_ms"] = round((time.perf_counter() - depart) * 1000)
+    ventes.attrs["lu_a"] = time.time()
+    ventes.attrs["lignes"] = int(len(ventes))
+    if requete:
+        ventes.attrs["requete"] = requete.strip()
+    if origine:
+        ventes.attrs["origine"] = origine
+    return ventes
+
+
 # ------------------------------------------------------------------
 # Un fichier
 # ------------------------------------------------------------------
 def depuis_csv(chemin: str | Path, **options: Any) -> pd.DataFrame:
     """Un export CSV, le point de départ de toutes les missions."""
-    return valide(pd.read_csv(chemin, **options), origine=Path(chemin).name)
+    depart = time.perf_counter()
+    ventes = valide(pd.read_csv(chemin, **options), origine=Path(chemin).name)
+    return _marque(ventes, depart, origine=Path(chemin).name)
 
 
 def depuis_excel(chemin: str | Path, feuille: Any = 0, **options: Any) -> pd.DataFrame:
     """Un classeur Excel, ce que le client envoie le plus souvent au début."""
-    return valide(pd.read_excel(chemin, sheet_name=feuille, **options),
-                  origine=Path(chemin).name)
+    depart = time.perf_counter()
+    ventes = valide(pd.read_excel(chemin, sheet_name=feuille, **options),
+                    origine=Path(chemin).name)
+    return _marque(ventes, depart, origine=Path(chemin).name)
 
 
 # ------------------------------------------------------------------
@@ -98,8 +121,12 @@ def depuis_base(connexion: Any, requete: str, parametres: Any = None,
     (`AS`) plutôt que côté Python : la traduction reste lisible par
     l'informaticien du client, qui est souvent celui qui la relira.
     """
+    depart = time.perf_counter()
     df = pd.read_sql(requete, connexion, params=parametres)
-    return valide(df, origine=origine)
+    ventes = valide(df, origine=origine)
+    # La durée et la requête sont posées sur le tableau : chez un client sur
+    # Oracle, c'est tout ce que son informaticien demande à voir.
+    return _marque(ventes, depart, requete=requete, origine=origine)
 
 
 def connexion_sqlite(chemin: str | Path) -> Any:
@@ -302,16 +329,13 @@ def depuis_table_snowflake(table: str, session=None, magasins=None,
     requete = requete_tickets(table, magasins, mois)
     depart = time.perf_counter()
     df = session.sql(requete).to_pandas()
-    duree = (time.perf_counter() - depart) * 1000
     # Snowflake renvoie des décimaux : on repasse en nombres ordinaires.
     for colonne in ("quantite", "prix_unitaire", "cout_unitaire", "ca_ttc"):
         if colonne in df.columns:
             df[colonne] = pd.to_numeric(df[colonne], errors="coerce").astype("float64")
     ventes = valide(df, origine=f"la table {table}")
-    ventes.attrs["requete"] = requete.strip()
-    ventes.attrs["duree_ms"] = round(duree)
-    ventes.attrs["lu_a"] = time.time()        # sert à l'actualisation automatique
-    return ventes
+    # `lu_a` sert aussi à l'actualisation automatique de l'écran.
+    return _marque(ventes, depart, requete=requete, origine=table)
 
 
 # ------------------------------------------------------------------

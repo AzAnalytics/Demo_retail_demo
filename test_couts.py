@@ -173,3 +173,88 @@ def test_phrase_repete_l_erreur_sans_inventer_de_chiffre():
     texte = couts.phrase({"erreur": "facturation illisible"}, prix_credit=2.5)
     assert texte == "facturation illisible"
     assert "€" not in texte
+
+
+# ------------------------------------------------------------------
+# Hors Snowflake : la charge demandée à la base du client
+# ------------------------------------------------------------------
+def test_un_registre_neuf_est_vide():
+    r = couts.registre_neuf()
+    assert r["lectures"] == 0 and r["duree_totale_ms"] == 0.0
+
+
+def test_une_lecture_est_comptee_avec_sa_duree_et_ses_lignes():
+    r = couts.suit(None, {"lu_a": 100.0, "duree_ms": 120, "lignes": 33840,
+                          "origine": "VENTES.TICKETS"})
+    assert r["lectures"] == 1
+    assert r["duree_totale_ms"] == 120.0
+    assert r["plus_lente_ms"] == 120.0
+    assert r["lignes"] == 33840
+    assert r["origine"] == "VENTES.TICKETS"
+
+
+def test_un_redessin_de_l_ecran_ne_compte_pas_une_seconde_lecture():
+    # Même `lu_a` : la donnée vient du cache, la base n'a rien fait.
+    attrs = {"lu_a": 100.0, "duree_ms": 120, "lignes": 10}
+    r = couts.suit(couts.suit(None, attrs), attrs)
+    assert r["lectures"] == 1
+
+
+def test_deux_vraies_lectures_s_additionnent_et_gardent_la_plus_lente():
+    r = couts.suit(None, {"lu_a": 100.0, "duree_ms": 120, "lignes": 10})
+    r = couts.suit(r, {"lu_a": 200.0, "duree_ms": 80, "lignes": 7})
+    assert r["lectures"] == 2
+    assert r["duree_totale_ms"] == 200.0
+    assert r["plus_lente_ms"] == 120.0      # la plus lente, pas la dernière
+    assert r["lignes"] == 7                 # la dernière lecture
+    assert r["lignes_cumul"] == 17
+
+
+def test_un_tableau_sans_horodatage_ne_fausse_pas_le_compteur():
+    r = couts.suit(None, {})
+    assert r["lectures"] == 0
+
+
+def test_la_phrase_de_charge_parle_a_un_informaticien():
+    r = couts.suit(None, {"lu_a": 1.0, "duree_ms": 450, "lignes": 33840})
+    texte = couts.phrase_charge(r)
+    assert "1 lecture" in texte
+    assert "0,45 s" in texte
+    assert "33 840 lignes" in texte
+
+
+def test_sans_lecture_la_phrase_le_dit_au_lieu_d_afficher_zero():
+    assert couts.phrase_charge(None) == "aucune lecture depuis l'ouverture de l'écran"
+
+
+# ------------------------------------------------------------------
+# L'écran, hors Snowflake : c'est le cas d'un client sur Oracle
+# ------------------------------------------------------------------
+def test_l_ecran_montre_la_charge_quand_il_n_y_a_pas_d_entrepot():
+    """Sans entrepôt, le panneau ne doit ni mentir ni rester muet.
+
+    C'est exactement ce que verra un client sur Oracle : pas de crédits,
+    mais le nombre de lectures, leur durée, et la phrase qui dit pourquoi
+    il n'y a pas d'euros à afficher.
+    """
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+
+    st.cache_data.clear()
+    try:
+        app = AppTest.from_file("app.py", default_timeout=180)
+        app.run()
+        assert not app.exception, [str(e) for e in app.exception]
+        textes = " ".join([m.value for m in app.markdown]
+                          + [c.value for c in app.caption])
+        assert "Ce que le Cockpit demande à votre base" in textes
+        assert "Aucun crédit à afficher ici" in textes
+        assert "votre serveur est déjà payé" in textes
+        # Et surtout : le bloc Snowflake, lui, ne s'affiche pas. Son
+        # indicateur « Crédits sur N jours » n'a rien à faire sur une base
+        # qui ne facture pas à l'usage.
+        labels = " ".join(m.label for m in app.get("metric"))
+        assert "Crédits sur" not in labels
+        assert "Lectures depuis l'ouverture" in labels
+    finally:
+        st.cache_data.clear()

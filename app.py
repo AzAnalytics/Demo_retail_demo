@@ -241,6 +241,13 @@ if probleme:
     st.caption("Le Cockpit préfère ne rien afficher plutôt que d'afficher un chiffre faux.")
     st.stop()
 
+# Ce que la lecture a demandé à la source, noté dès maintenant et pas
+# seulement quand quelqu'un ouvre le panneau technique. Chez un client sur
+# Oracle il n'y a pas de crédit à afficher, mais son informaticien pose la
+# même question : qu'est-ce que cet écran demande à ma base ?
+st.session_state[couts.CLEF_REGISTRE] = couts.suit(
+    st.session_state.get(couts.CLEF_REGISTRE), df.attrs)
+
 # Le périmètre de la personne connectée, appliqué AVANT tout calcul : un
 # graphique caché n'est pas une protection, et la prévision travaillerait
 # sinon sur des lignes que cette personne n'a pas le droit de voir.
@@ -751,11 +758,14 @@ if autorise_a("diagnostic"):
                            "les lignes des autres magasins ne sortent jamais "
                            "de l'entrepôt.")
 
-        # Le coût, lu dans la facturation de Snowflake plutôt qu'estimé.
-        # C'est la question que pose un dirigeant avant même de demander
-        # comment c'est fait, et la seule réponse qui vaille est celle que
-        # l'entrepôt facture lui-même.
-        if dans_sf and autorise_a("administrer"):
+        # Ce que l'outil consomme, avec deux visages selon la source :
+        #   - dans Snowflake, des crédits, parce que l'entrepôt facture à la
+        #     seconde et que c'est la première question d'un dirigeant ;
+        #   - ailleurs (Oracle, SQL Server, Postgres, fichier), la charge
+        #     demandée à la base, parce qu'il n'y a aucun euro à afficher
+        #     mais que l'informaticien du client veut savoir ce qu'on lui
+        #     prend. Même promesse dans les deux cas : rien n'est caché.
+        if autorise_a("administrer") and dans_sf:
             @st.cache_data(ttl=900, show_spinner=False)
             def facturation(jours: int, base: str) -> dict:
                 # Quinze minutes de cache : relire la facturation à chaque
@@ -811,6 +821,31 @@ if autorise_a("diagnostic"):
                 "Le plafond mensuel, lui, est posé par un moniteur de "
                 "ressources (snowflake/04_couts.sql) : au-delà du quota, "
                 "Snowflake suspend l'entrepôt au lieu de facturer."
+            )
+
+        elif autorise_a("administrer"):
+            # Sur une base que le client possède déjà (Oracle, SQL Server,
+            # Postgres) ou sur un simple fichier, il n'y a pas d'euro à
+            # afficher : le serveur est payé, l'écran ne coûte rien de plus.
+            # On montre donc la charge, qui est la vraie question posée.
+            registre = st.session_state.get(couts.CLEF_REGISTRE) or {}
+            st.markdown("**Ce que le Cockpit demande à votre base**")
+            col_l, col_d, col_p = st.columns(3)
+            col_l.metric("Lectures depuis l'ouverture",
+                         int(registre.get("lectures", 0)))
+            col_d.metric("Temps total demandé",
+                         f"{couts.fr(float(registre.get('duree_totale_ms', 0)) / 1000, 2)} s")
+            col_p.metric("Lecture la plus lente",
+                         f"{couts.fr(float(registre.get('plus_lente_ms', 0)) / 1000, 2)} s")
+            st.caption(couts.phrase_charge(registre))
+            st.caption(
+                "Aucun crédit à afficher ici : votre serveur est déjà payé, "
+                "le Cockpit ne vous coûte pas un euro de plus. Ce qui compte "
+                "alors, c'est la charge, et la voici, mesurée par "
+                "l'application elle-même, sans aucun privilège demandé à "
+                "votre base. L'écran relit au plus une fois par heure, et "
+                "les filtres ne déclenchent aucune lecture : ils travaillent "
+                "sur ce qui est déjà en mémoire."
             )
 
 # ------------------------------------------------------------------

@@ -173,6 +173,71 @@ def resume(jours: int = 30, session=None, entrepot: str = "",
     return sortie
 
 
+# ==================================================================
+# Hors Snowflake : ce que le Cockpit demande à la base du client
+# ==================================================================
+# Chez un client sur Oracle, SQL Server ou Postgres, il n'y a pas de crédit
+# à afficher : le serveur est déjà payé, le tableau de bord ne coûte pas un
+# euro de plus. Afficher « 0 € » serait un mensonge poli.
+#
+# La question de son informaticien existe pourtant, et c'est une autre :
+# « qu'est-ce que votre écran va demander à ma base ? » Elle se mesure sans
+# aucun privilège, puisque le Cockpit chronomètre déjà chacune de ses
+# lectures (voir `_marque` dans source_donnees.py). On tient donc un petit
+# registre, dans la session de la personne connectée, et on le montre.
+
+CLEF_REGISTRE = "_cockpit_lectures"
+
+
+def registre_neuf() -> dict:
+    """Un registre vide : aucune lecture encore faite dans cette session."""
+    return {"lectures": 0, "duree_totale_ms": 0.0, "plus_lente_ms": 0.0,
+            "lignes": 0, "lignes_cumul": 0, "derniere": None, "origine": ""}
+
+
+def suit(registre: dict | None, attrs=None) -> dict:
+    """Ajoute une lecture au registre, mais seulement si elle est nouvelle.
+
+    L'écran se redessine à chaque clic alors que la donnée, elle, vient du
+    cache : compter une lecture à chaque passage gonflerait le chiffre et
+    donnerait une fausse idée de la charge. L'horodatage `lu_a`, posé par
+    la source au moment où elle a vraiment lu, sert de repère : même
+    valeur, même lecture, on ne compte pas deux fois.
+    """
+    courant = dict(registre or registre_neuf())
+    attrs = attrs or {}
+    lu_a = attrs.get("lu_a")
+    if lu_a is None or lu_a == courant.get("derniere"):
+        return courant
+    duree = _nombre(attrs.get("duree_ms"))
+    lignes = int(_nombre(attrs.get("lignes")))
+    courant["lectures"] = int(_nombre(courant.get("lectures"))) + 1
+    courant["duree_totale_ms"] = round(
+        _nombre(courant.get("duree_totale_ms")) + duree, 1)
+    courant["plus_lente_ms"] = round(
+        max(_nombre(courant.get("plus_lente_ms")), duree), 1)
+    courant["lignes"] = lignes
+    courant["lignes_cumul"] = int(_nombre(courant.get("lignes_cumul"))) + lignes
+    courant["derniere"] = lu_a
+    courant["origine"] = str(attrs.get("origine", "") or courant.get("origine", ""))
+    return courant
+
+
+def phrase_charge(registre: dict | None) -> str:
+    """Ce que le Cockpit a demandé à la base, en une phrase pour un informaticien."""
+    r = registre or registre_neuf()
+    lectures = int(_nombre(r.get("lectures")))
+    if not lectures:
+        return "aucune lecture depuis l'ouverture de l'écran"
+    total = _nombre(r.get("duree_totale_ms"))
+    pire = _nombre(r.get("plus_lente_ms"))
+    lignes = int(_nombre(r.get("lignes")))
+    return (f"{lectures} lecture{'s' if lectures > 1 else ''} depuis l'ouverture, "
+            f"{fr(total / 1000, 2)} s au total, "
+            f"la plus lente {fr(pire / 1000, 2)} s, "
+            f"{fr(lignes, 0)} lignes ramenées la dernière fois.")
+
+
 def fr(nombre: float, decimales: int = 2) -> str:
     """Un nombre à la française : virgule décimale, espace entre les milliers."""
     texte = f"{_nombre(nombre):,.{int(decimales)}f}"
