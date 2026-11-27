@@ -715,8 +715,11 @@ if autorise_a("diagnostic"):
                 f"**Lignes lues** : {lignes}",
                 f"**Période** : du {df['date'].min():%d/%m/%Y} "
                 f"au {df['date'].max():%d/%m/%Y}",
-                ("**Lecture de l'entrepôt** : "
-                 f"{mesure['duree_ms']} ms" if mesure.get("duree_ms")
+                # Le mot suit la source : parler d'entrepôt devant un client
+                # qui lit un fichier ou son Oracle sonne faux, et c'est le
+                # genre de détail qui décrédibilise tout le reste de l'écran.
+                (f"**Durée de la lecture** : {mesure['duree_ms']} ms"
+                 if mesure.get("duree_ms")
                  else "**Relecture** : au plus une fois par heure (cache)"),
                 f"**Profils chargés** : {len(PROFILS) if PROFILS else 'aucun'}",
             ])
@@ -729,11 +732,13 @@ if autorise_a("diagnostic"):
             # plus cher en confiance qu'elle ne rapporte en précision.
             age = max(0, int(time.time() - mesure["lu_a"]))
             quand = f"il y a {age} s" if age < 90 else f"il y a {age // 60} min"
+            quoi = "Entrepôt lu" if dans_sf else "Source lue"
             suite = (f"relecture automatique toutes les {FRAICHEUR // 60} minutes"
                      if FRAICHEUR >= 60 else
-                     "relecture à l'ouverture de la page, pour ne pas réveiller "
-                     "l'entrepôt inutilement")
-            st.caption(f"Entrepôt lu {quand}, {suite}.")
+                     ("relecture à l'ouverture de la page, pour ne pas réveiller "
+                      "l'entrepôt inutilement" if dans_sf else
+                      "relecture à l'ouverture de la page, pas à chaque clic"))
+            st.caption(f"{quoi} {quand}, {suite}.")
         if st.button("Relire maintenant", icon="🔄",
                      help="Sans attendre la prochaine actualisation."):
             st.cache_data.clear()
