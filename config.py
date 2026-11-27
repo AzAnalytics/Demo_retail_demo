@@ -110,6 +110,20 @@ MOIS_HISTORIQUE = int(_get("COCKPIT_MOIS_HISTORIQUE", "36"))
 # les ventes arrivent en continu, mettre 300 (cinq minutes).
 FRAICHEUR_S = int(_get("COCKPIT_FRAICHEUR_S", "0"))
 
+# Ce que l'entrepôt a coûté, affiché dans le panneau technique (couts.py).
+#
+# Le crédit Snowflake est la seule unité exacte : son prix dépend de l'édition,
+# de la région et du contrat (Standard sur AWS Europe : environ 2,50 € fin
+# 2026). Il s'écrit donc ici, et l'écran précise que l'euro affiché est une
+# conversion, pas une facture. Mettre 0 pour n'afficher que des crédits.
+PRIX_CREDIT = float(_get("COCKPIT_PRIX_CREDIT", "2.50"))
+
+# Sur combien de jours regarder la facturation. Snowflake garde six mois de
+# facturation mais seulement sept jours de détail des requêtes : le panneau
+# l'affiche, pour ne pas laisser croire que les deux chiffres couvrent la
+# même période.
+COUTS_JOURS = int(_get("COCKPIT_COUTS_JOURS", "30"))
+
 # Export des données : désactivé par défaut. Sur une vitrine, un bouton qui
 # renvoie vers Excel contredit la promesse du produit, et personne ne
 # télécharge les ventes d'une boutique fictive. Chez un client, on le met à 1 :

@@ -168,10 +168,45 @@ pas de copie de fichiers.
 **Le vrai poste de coût, c'est l'application ouverte, pas les requêtes.** Tant
 qu'un onglet du Cockpit est ouvert dans Snowflake, l'entrepôt reste allumé :
 mesuré à 1,22 crédit sur une heure. Fermer l'onglet après une démonstration
-vaut toutes les optimisations de requête. Pensez aussi à poser un budget dans
-Admin > Cost management, qui prévient par courriel.
+vaut toutes les optimisations de requête.
 
 L'entrepôt `WH_XS` ne tourne que pendant une requête et se suspend tout seul.
 La lecture complète des 33 841 lignes prend moins d'une seconde, et
 l'application ne relit l'entrepôt qu'une fois par heure (cache). Une
 démonstration d'une heure coûte quelques centimes de crédit.
+
+### Le plafond : `snowflake/04_couts.sql`
+
+À exécuter une fois, en `ACCOUNTADMIN`. Le script pose trois choses :
+
+| Objet | Réglage | Pourquoi |
+|---|---|---|
+| Moniteur `MONITEUR_COCKPIT` | 10 crédits par mois, alertes à 50 % et 80 %, suspension à 100 %, coupure à 110 % | Le seul garde-fou qui agisse seul, la nuit, sans personne devant l'écran |
+| Entrepôt `WH_XS` | `AUTO_SUSPEND = 60`, `STATEMENT_TIMEOUT_IN_SECONDS = 300` | S'éteint après une minute ; une requête partie en vrille s'arrête au lieu de finir sur la facture |
+| `GRANT MONITOR ON WAREHOUSE` à `COCKPIT_DIRECTION` | lecture de la facturation | Sans ce droit, le panneau de coût affiche un refus au lieu de chiffres |
+
+Les courriels d'alerte ne partent qu'aux administrateurs **qui ont activé les
+notifications** dans Snowsight (menu du compte, Notifications). Sans cela, le
+quota agit mais ne prévient personne.
+
+### Le compteur dans l'écran
+
+Le panneau `🔧 État technique` affiche, pour un profil administrateur et
+seulement quand l'application tourne dans Snowflake, un bloc **Ce que
+l'entrepôt a coûté** : les crédits des 30 derniers jours, ceux de la journée,
+la conversion en euros, et le nombre de requêtes des 7 derniers jours.
+
+Trois précisions qui évitent de dire une bêtise devant un client :
+
+- les crédits viennent de `WAREHOUSE_METERING_HISTORY`, c'est-à-dire de ce que
+  Snowflake facture, pas d'un compteur maison ;
+- l'euro est une **conversion** au prix réglé dans `COCKPIT_PRIX_CREDIT`
+  (2,50 € par défaut), pas une facture : le prix réel dépend du contrat, de
+  l'édition et de la région ;
+- Snowflake garde six mois de facturation mais seulement **sept jours** de
+  détail des requêtes : les deux chiffres ne couvrent pas la même période, et
+  l'écran le dit.
+
+Le module `couts.py` ne lève jamais d'exception : sans droit `MONITOR`, sans
+entrepôt ou hors de Snowflake, il renvoie une phrase et le tableau de bord
+continue de fonctionner.

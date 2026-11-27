@@ -23,6 +23,7 @@ import acces                    # verrou d'entrée quand le Cockpit tourne chez 
 import permissions as perm      # qui voit quelles lignes (l'équivalent du RLS)
 import comptes                  # les personnes et leurs droits, dans l'entrepôt
 import journal                  # qui s'est connecté, quand, depuis quel compte
+import couts                    # ce que l'entrepôt a coûté, lu dans la facturation
 import cockpit_calculs as cal   # tous les calculs, testés dans test_cockpit.py
 import source_donnees as src   # fichier, table Snowflake, base du client
 import cockpit_forecast as cf
@@ -749,6 +750,68 @@ if autorise_a("diagnostic"):
                 st.caption("Le périmètre du compte est dans la requête : "
                            "les lignes des autres magasins ne sortent jamais "
                            "de l'entrepôt.")
+
+        # Le coût, lu dans la facturation de Snowflake plutôt qu'estimé.
+        # C'est la question que pose un dirigeant avant même de demander
+        # comment c'est fait, et la seule réponse qui vaille est celle que
+        # l'entrepôt facture lui-même.
+        if dans_sf and autorise_a("administrer"):
+            @st.cache_data(ttl=900, show_spinner=False)
+            def facturation(jours: int, base: str) -> dict:
+                # Quinze minutes de cache : relire la facturation à chaque
+                # clic coûterait plus cher que ce qu'elle mesure.
+                try:
+                    return couts.resume(jours=jours, base=base)
+                except Exception as erreur:          # jamais bloquant
+                    return {"erreur": str(erreur)}
+
+            jours_couts = int(reglage("COUTS_JOURS", 30))
+            prix_credit = float(reglage("PRIX_CREDIT", 0) or 0)
+            bilan = facturation(jours_couts, couts.base_de(table_sf or ""))
+            st.markdown("**Ce que l'entrepôt a coûté**")
+            if bilan.get("erreur"):
+                st.caption(
+                    f"Facturation non lisible : {str(bilan['erreur'])[:150]}. "
+                    "Le privilège MONITOR sur l'entrepôt suffit à l'ouvrir "
+                    "(script snowflake/04_couts.sql)."
+                )
+            else:
+                credits = float(bilan.get("credits", 0) or 0)
+                col_c, col_e, col_j = st.columns(3)
+                col_c.metric(f"Crédits sur {jours_couts} jours",
+                             couts.fr(credits, 2))
+                col_e.metric(
+                    "Soit environ",
+                    f"{couts.fr(couts.en_euros(credits, prix_credit))} €"
+                    if prix_credit else "prix du crédit non renseigné",
+                    help=(f"Conversion au prix indiqué dans la configuration "
+                          f"({couts.fr(prix_credit)} € le crédit). Ce n'est pas "
+                          "une facture : le prix réel dépend du contrat, de "
+                          "l'édition et de la région.") if prix_credit else
+                         "Renseigner COCKPIT_PRIX_CREDIT pour voir des euros.",
+                )
+                col_j.metric("Dont aujourd'hui",
+                             couts.fr(bilan.get("credits_aujourdhui", 0), 3))
+                detail = [f"entrepôt {bilan.get('entrepot', '?')}",
+                          f"{int(bilan.get('jours_actifs', 0))} jour(s) avec "
+                          "de la consommation"]
+                if "requetes" in bilan:
+                    detail.append(
+                        f"{int(bilan['requetes'])} requêtes et "
+                        f"{couts.fr(bilan.get('secondes', 0), 1)} s d'exécution "
+                        f"sur {int(bilan.get('jours_activite', 7))} jours "
+                        "(Snowflake ne garde pas le détail au-delà)"
+                    )
+                st.caption(" · ".join(detail) + ".")
+            st.caption(
+                "Le vrai poste de coût n'est pas la requête mais l'onglet : "
+                "tant que le Cockpit reste ouvert, l'entrepôt reste allumé, "
+                "mesuré à 1,22 crédit l'heure. Fermer la page après une "
+                "démonstration vaut toutes les optimisations de requête. "
+                "Le plafond mensuel, lui, est posé par un moniteur de "
+                "ressources (snowflake/04_couts.sql) : au-delà du quota, "
+                "Snowflake suspend l'entrepôt au lieu de facturer."
+            )
 
 # ------------------------------------------------------------------
 # Gérer les personnes depuis l'écran
